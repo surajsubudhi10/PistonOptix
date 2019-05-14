@@ -1,0 +1,10 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/builds
+/support/glfw/.github
+/support/glfw/.travis.yml
+/support/glfw/.appveyor.yml
+/support/glfw/COPYING.txt
+/support/glfw/README.md
