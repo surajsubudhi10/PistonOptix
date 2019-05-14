@@ -4,8 +4,12 @@
 #define RANDOM_NUMBER_GENERATORS_H
 
 #include "app_config.h"
-
 #include "rt_function.h"
+
+#include <optix.h>
+#include <optixu/optixu_math_namespace.h>
+
+using namespace optix;
 
 // Tiny Encryption Algorithm (TEA) to calculate a the seed per launch index and iteration.
 template<unsigned int N>

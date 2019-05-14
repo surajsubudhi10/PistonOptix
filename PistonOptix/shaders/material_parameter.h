@@ -3,6 +3,14 @@
 #ifndef MATERIAL_PARAMETER_H
 #define MATERIAL_PARAMETER_H
 
+enum EBrdfTypes 
+{
+	LAMBERT,
+
+	NUM_OF_BRDF
+};
+
+
 // Just some hardcoded material parameter system.
 struct MaterialParameter
 {

@@ -36,6 +36,8 @@
 #include <map>
 
 
+using namespace optix;
+
  // For rtDevice*() function error checking. No OptiX context present at that time.
 #define RT_CHECK_ERROR_NO_CONTEXT( func ) \
   do { \
@@ -60,6 +62,7 @@ enum GuiState
 struct MaterialParameterGUI
 {
 	optix::float3 albedo; // albedo, color, tint, throughput change for specular materials.
+
 };
 
 
@@ -147,7 +150,13 @@ private:
 	// OptiX variables:
 	optix::Context m_context;
 
+	// Output Buffer
 	optix::Buffer m_bufferOutput;
+
+	// BRDF Buffers
+	optix::Buffer m_bufferBRDFSample;
+	optix::Buffer m_bufferBRDFEval;
+	optix::Buffer m_bufferBRDFPdf;
 
 	std::map<std::string, optix::Program> m_mapOfPrograms;
 

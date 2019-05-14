@@ -7,6 +7,7 @@
 #include "per_ray_data.h"
 #include "material_parameter.h"
 #include "shader_common.h"
+#include "PistonOptix/inc/CudaUtils/State.h"
 
 // Context global variables provided by the renderer system.
 rtDeclareVariable(rtObject, sysTopObject, , );
@@ -27,6 +28,11 @@ rtDeclareVariable(optix::float3, varNormal, attribute NORMAL, );
 // Material parameter definition.
 rtBuffer<MaterialParameter> sysMaterialParameters; // Context global buffer with an array of structures of MaterialParameter.
 rtDeclareVariable(int, parMaterialIndex, , ); // Per Material index into the sysMaterialParameters array.
+rtDeclareVariable(int, programId, , );
+
+rtBuffer< rtCallableProgramId<void(MaterialParameter &mat, State &state, PerRayData &prd)> > sysBRDFPdf;
+rtBuffer< rtCallableProgramId<void(MaterialParameter &mat, State &state, PerRayData &prd)> > sysBRDFSample;
+rtBuffer< rtCallableProgramId<float3(MaterialParameter &mat, State &state, PerRayData &prd)> > sysBRDFEval;
 
 
 // Helper functions for sampling a cosine weighted hemisphere distrobution as needed for the Lambert shading model.
@@ -61,9 +67,10 @@ RT_FUNCTION void unitSquareToCosineHemisphere(const float2 sample, float3 const&
 RT_PROGRAM void closesthit()
 {
 	float3 geoNormal = optix::normalize(rtTransformNormal(RT_OBJECT_TO_WORLD, varGeoNormal));
-	float3 normal = optix::normalize(rtTransformNormal(RT_OBJECT_TO_WORLD, varNormal));
+	float3 shading_normal = optix::normalize(rtTransformNormal(RT_OBJECT_TO_WORLD, varNormal));
 
-	thePrd.pos = theRay.origin + theRay.direction * theIntersectionDistance; // Advance the path to the hit position in world coordinates.
+	// Advance the path to the hit position in world coordinates.
+	thePrd.hit_pos = theRay.origin + theRay.direction * theIntersectionDistance; 
 
 	// Explicitly include edge-on cases as frontface condition! (Important for nested materials shown in a later example.)
 	thePrd.flags |= (0.0f <= optix::dot(thePrd.wo, geoNormal)) ? FLAG_FRONTFACE : 0;
@@ -73,9 +80,13 @@ RT_PROGRAM void closesthit()
 		// Means geometric normal and shading normal are always defined on the side currently looked at.
 		// This gives the backfaces of opaque BSDFs a defined result.
 		geoNormal = -geoNormal;
-		normal = -normal;
+		shading_normal = -shading_normal;
 		// Do not recalculate the frontface condition!
 	}
+
+	State state;
+	state.hit_position = thePrd.hit_pos;
+	state.shading_normal = shading_normal;
 
 	// A material system with support for arbitrary mesh lights would evaluate its emission here.
 	thePrd.radiance = make_float3(0.0f);
@@ -84,9 +95,13 @@ RT_PROGRAM void closesthit()
 	thePrd.f_over_pdf = make_float3(0.0f);
 	thePrd.pdf = 0.0f;
 
-	// Lambert sampling: Cosine weighted hemisphere sampling above the shading normal.
-	// This calculates the ray.direction for the next path segment in wi and its probability density function value in pdf.
-	unitSquareToCosineHemisphere(rng2(thePrd.seed), normal, thePrd.wi, thePrd.pdf);
+	MaterialParameter mat = sysMaterialParameters[parMaterialIndex];
+
+
+	// BRDF Sampling
+	sysBRDFSample[0](mat, state, thePrd);
+	sysBRDFPdf[0](mat, state, thePrd);
+	float3 f = sysBRDFEval[0](mat, state, thePrd);
 
 	// Do not sample opaque surfaces below the geometry!
 	// Mind that the geometry normal has been flipped to the side the ray points at.
@@ -96,14 +111,9 @@ RT_PROGRAM void closesthit()
 		return;
 	}
 
-	MaterialParameter parameters = sysMaterialParameters[parMaterialIndex];
-
-	// This would be the universal implementation for an arbitrary sampling of a diffuse surface.
-	// thePrd.f_over_pdf = parameters.albedo * (M_1_PIf * fabsf(optix::dot(prd.wi, normal)) / prd.pdf); 
-
 	// PERF Since the cosine-weighted hemisphere distribution is a perfect importance-sampling of the Lambert material,
 	// the whole term ((M_1_PIf * fabsf(optix::dot(prd.wi, normal)) / prd.pdf) is always 1.0f here!
-	thePrd.f_over_pdf = parameters.albedo;
+	thePrd.f_over_pdf = f * fabsf(optix::dot(thePrd.wi, state.shading_normal)) / thePrd.pdf;
 
 	// This is a brute-force path tracer. There is no next event estimation (direct lighting) here.
 	// Note that because of that, the albedo affects the path throughput only.

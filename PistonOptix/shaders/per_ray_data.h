@@ -4,7 +4,6 @@
 #define PER_RAY_DATA_H
 
 #include "app_config.h"
-
 #include "random_number_generators.h"
 
 // Set if (0.0f <= wo_dot_ng), means looking onto the front face. (Edge-on is explicitly handled as frontface for the material stack.)
@@ -17,7 +16,7 @@
 // Note that the fields are ordered by CUDA alignment.
 struct PerRayData
 {
-	optix::float3 pos;            // Current surface hit point, in world space
+	optix::float3 hit_pos;        // Current surface hit point, in world space
 
 	optix::float3 wo;             // Outgoing direction, to observer, in world space.
 	optix::float3 wi;             // Incoming direction, to light, in world space.

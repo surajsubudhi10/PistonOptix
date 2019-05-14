@@ -17,6 +17,8 @@ OPTIX_add_sample_executable( PistonOptix
 
   inc/MyAssert.h
 
+  inc/CudaUtils/State.h
+
   shaders/app_config.h
   shaders/material_parameter.h
   shaders/per_ray_data.h
@@ -34,6 +36,9 @@ OPTIX_add_sample_executable( PistonOptix
   shaders/miss.cu
 
   shaders/closesthit.cu
+  shaders/lambert.cu
+
+  
 )    
 
 include_directories(

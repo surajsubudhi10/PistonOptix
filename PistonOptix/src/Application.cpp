@@ -1,31 +1,3 @@
-/*
- * Copyright (c) 2013-2018, NVIDIA CORPORATION. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
 #include "shaders/app_config.h"
 
 #include "inc/Application.h"
@@ -42,7 +14,7 @@
 
 #include "shaders/material_parameter.h"
 
- // DAR Only for sutil::samplesPTXDir() and sutil::writeBufferToFile()
+// DAR Only for sutil::samplesPTXDir() and sutil::writeBufferToFile()
 #include <sutil.h>
 
 #include "inc/MyAssert.h"
@@ -88,52 +60,53 @@ Application::Application(GLFWwindow* window,
 	const float r = 1.0f;
 	const float g = 1.0f;
 	const float b = 1.0f;
-
-	style.Colors[ImGuiCol_Text] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-	style.Colors[ImGuiCol_TextDisabled] = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
-	style.Colors[ImGuiCol_WindowBg] = ImVec4(r * 0.2f, g * 0.2f, b * 0.2f, 0.6f);
-	style.Colors[ImGuiCol_ChildWindowBg] = ImVec4(r * 0.2f, g * 0.2f, b * 0.2f, 1.0f);
-	style.Colors[ImGuiCol_PopupBg] = ImVec4(r * 0.2f, g * 0.2f, b * 0.2f, 1.0f);
-	style.Colors[ImGuiCol_Border] = ImVec4(r * 0.4f, g * 0.4f, b * 0.4f, 0.4f);
-	style.Colors[ImGuiCol_BorderShadow] = ImVec4(r * 0.0f, g * 0.0f, b * 0.0f, 0.4f);
-	style.Colors[ImGuiCol_FrameBg] = ImVec4(r * 0.4f, g * 0.4f, b * 0.4f, 0.4f);
-	style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(r * 0.6f, g * 0.6f, b * 0.6f, 0.6f);
-	style.Colors[ImGuiCol_FrameBgActive] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 0.8f);
-	style.Colors[ImGuiCol_TitleBg] = ImVec4(r * 0.6f, g * 0.6f, b * 0.6f, 0.6f);
-	style.Colors[ImGuiCol_TitleBgCollapsed] = ImVec4(r * 0.2f, g * 0.2f, b * 0.2f, 0.2f);
-	style.Colors[ImGuiCol_TitleBgActive] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 0.8f);
-	style.Colors[ImGuiCol_MenuBarBg] = ImVec4(r * 0.2f, g * 0.2f, b * 0.2f, 1.0f);
-	style.Colors[ImGuiCol_ScrollbarBg] = ImVec4(r * 0.2f, g * 0.2f, b * 0.2f, 0.2f);
-	style.Colors[ImGuiCol_ScrollbarGrab] = ImVec4(r * 0.4f, g * 0.4f, b * 0.4f, 0.4f);
-	style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(r * 0.6f, g * 0.6f, b * 0.6f, 0.6f);
-	style.Colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 0.8f);
-	style.Colors[ImGuiCol_CheckMark] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 0.8f);
-	style.Colors[ImGuiCol_SliderGrab] = ImVec4(r * 0.4f, g * 0.4f, b * 0.4f, 0.4f);
-	style.Colors[ImGuiCol_SliderGrabActive] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 0.8f);
-	style.Colors[ImGuiCol_Button] = ImVec4(r * 0.4f, g * 0.4f, b * 0.4f, 0.4f);
-	style.Colors[ImGuiCol_ButtonHovered] = ImVec4(r * 0.6f, g * 0.6f, b * 0.6f, 0.6f);
-	style.Colors[ImGuiCol_ButtonActive] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 0.8f);
-	style.Colors[ImGuiCol_Header] = ImVec4(r * 0.4f, g * 0.4f, b * 0.4f, 0.4f);
-	style.Colors[ImGuiCol_HeaderHovered] = ImVec4(r * 0.6f, g * 0.6f, b * 0.6f, 0.6f);
-	style.Colors[ImGuiCol_HeaderActive] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 0.8f);
-	style.Colors[ImGuiCol_Column] = ImVec4(r * 0.4f, g * 0.4f, b * 0.4f, 0.4f);
-	style.Colors[ImGuiCol_ColumnHovered] = ImVec4(r * 0.6f, g * 0.6f, b * 0.6f, 0.6f);
-	style.Colors[ImGuiCol_ColumnActive] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 0.8f);
-	style.Colors[ImGuiCol_ResizeGrip] = ImVec4(r * 0.6f, g * 0.6f, b * 0.6f, 0.6f);
-	style.Colors[ImGuiCol_ResizeGripHovered] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 0.8f);
-	style.Colors[ImGuiCol_ResizeGripActive] = ImVec4(r * 1.0f, g * 1.0f, b * 1.0f, 1.0f);
-	style.Colors[ImGuiCol_CloseButton] = ImVec4(r * 0.4f, g * 0.4f, b * 0.4f, 0.4f);
-	style.Colors[ImGuiCol_CloseButtonHovered] = ImVec4(r * 0.6f, g * 0.6f, b * 0.6f, 0.6f);
-	style.Colors[ImGuiCol_CloseButtonActive] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 0.8f);
-	style.Colors[ImGuiCol_PlotLines] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 1.0f);
-	style.Colors[ImGuiCol_PlotLinesHovered] = ImVec4(r * 1.0f, g * 1.0f, b * 1.0f, 1.0f);
-	style.Colors[ImGuiCol_PlotHistogram] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 1.0f);
-	style.Colors[ImGuiCol_PlotHistogramHovered] = ImVec4(r * 1.0f, g * 1.0f, b * 1.0f, 1.0f);
-	style.Colors[ImGuiCol_TextSelectedBg] = ImVec4(r * 0.5f, g * 0.5f, b * 0.5f, 1.0f);
-	style.Colors[ImGuiCol_ModalWindowDarkening] = ImVec4(r * 0.2f, g * 0.2f, b * 0.2f, 0.2f);
-	style.Colors[ImGuiCol_DragDropTarget] = ImVec4(r * 1.0f, g * 1.0f, b * 0.0f, 1.0f); // Yellow
-	style.Colors[ImGuiCol_NavHighlight] = ImVec4(r * 1.0f, g * 1.0f, b * 1.0f, 1.0f);
-	style.Colors[ImGuiCol_NavWindowingHighlight] = ImVec4(r * 1.0f, g * 1.0f, b * 1.0f, 1.0f);
+	{
+		style.Colors[ImGuiCol_Text] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+		style.Colors[ImGuiCol_TextDisabled] = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
+		style.Colors[ImGuiCol_WindowBg] = ImVec4(r * 0.2f, g * 0.2f, b * 0.2f, 0.6f);
+		style.Colors[ImGuiCol_ChildWindowBg] = ImVec4(r * 0.2f, g * 0.2f, b * 0.2f, 1.0f);
+		style.Colors[ImGuiCol_PopupBg] = ImVec4(r * 0.2f, g * 0.2f, b * 0.2f, 1.0f);
+		style.Colors[ImGuiCol_Border] = ImVec4(r * 0.4f, g * 0.4f, b * 0.4f, 0.4f);
+		style.Colors[ImGuiCol_BorderShadow] = ImVec4(r * 0.0f, g * 0.0f, b * 0.0f, 0.4f);
+		style.Colors[ImGuiCol_FrameBg] = ImVec4(r * 0.4f, g * 0.4f, b * 0.4f, 0.4f);
+		style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(r * 0.6f, g * 0.6f, b * 0.6f, 0.6f);
+		style.Colors[ImGuiCol_FrameBgActive] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 0.8f);
+		style.Colors[ImGuiCol_TitleBg] = ImVec4(r * 0.6f, g * 0.6f, b * 0.6f, 0.6f);
+		style.Colors[ImGuiCol_TitleBgCollapsed] = ImVec4(r * 0.2f, g * 0.2f, b * 0.2f, 0.2f);
+		style.Colors[ImGuiCol_TitleBgActive] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 0.8f);
+		style.Colors[ImGuiCol_MenuBarBg] = ImVec4(r * 0.2f, g * 0.2f, b * 0.2f, 1.0f);
+		style.Colors[ImGuiCol_ScrollbarBg] = ImVec4(r * 0.2f, g * 0.2f, b * 0.2f, 0.2f);
+		style.Colors[ImGuiCol_ScrollbarGrab] = ImVec4(r * 0.4f, g * 0.4f, b * 0.4f, 0.4f);
+		style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(r * 0.6f, g * 0.6f, b * 0.6f, 0.6f);
+		style.Colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 0.8f);
+		style.Colors[ImGuiCol_CheckMark] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 0.8f);
+		style.Colors[ImGuiCol_SliderGrab] = ImVec4(r * 0.4f, g * 0.4f, b * 0.4f, 0.4f);
+		style.Colors[ImGuiCol_SliderGrabActive] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 0.8f);
+		style.Colors[ImGuiCol_Button] = ImVec4(r * 0.4f, g * 0.4f, b * 0.4f, 0.4f);
+		style.Colors[ImGuiCol_ButtonHovered] = ImVec4(r * 0.6f, g * 0.6f, b * 0.6f, 0.6f);
+		style.Colors[ImGuiCol_ButtonActive] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 0.8f);
+		style.Colors[ImGuiCol_Header] = ImVec4(r * 0.4f, g * 0.4f, b * 0.4f, 0.4f);
+		style.Colors[ImGuiCol_HeaderHovered] = ImVec4(r * 0.6f, g * 0.6f, b * 0.6f, 0.6f);
+		style.Colors[ImGuiCol_HeaderActive] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 0.8f);
+		style.Colors[ImGuiCol_Column] = ImVec4(r * 0.4f, g * 0.4f, b * 0.4f, 0.4f);
+		style.Colors[ImGuiCol_ColumnHovered] = ImVec4(r * 0.6f, g * 0.6f, b * 0.6f, 0.6f);
+		style.Colors[ImGuiCol_ColumnActive] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 0.8f);
+		style.Colors[ImGuiCol_ResizeGrip] = ImVec4(r * 0.6f, g * 0.6f, b * 0.6f, 0.6f);
+		style.Colors[ImGuiCol_ResizeGripHovered] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 0.8f);
+		style.Colors[ImGuiCol_ResizeGripActive] = ImVec4(r * 1.0f, g * 1.0f, b * 1.0f, 1.0f);
+		style.Colors[ImGuiCol_CloseButton] = ImVec4(r * 0.4f, g * 0.4f, b * 0.4f, 0.4f);
+		style.Colors[ImGuiCol_CloseButtonHovered] = ImVec4(r * 0.6f, g * 0.6f, b * 0.6f, 0.6f);
+		style.Colors[ImGuiCol_CloseButtonActive] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 0.8f);
+		style.Colors[ImGuiCol_PlotLines] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 1.0f);
+		style.Colors[ImGuiCol_PlotLinesHovered] = ImVec4(r * 1.0f, g * 1.0f, b * 1.0f, 1.0f);
+		style.Colors[ImGuiCol_PlotHistogram] = ImVec4(r * 0.8f, g * 0.8f, b * 0.8f, 1.0f);
+		style.Colors[ImGuiCol_PlotHistogramHovered] = ImVec4(r * 1.0f, g * 1.0f, b * 1.0f, 1.0f);
+		style.Colors[ImGuiCol_TextSelectedBg] = ImVec4(r * 0.5f, g * 0.5f, b * 0.5f, 1.0f);
+		style.Colors[ImGuiCol_ModalWindowDarkening] = ImVec4(r * 0.2f, g * 0.2f, b * 0.2f, 0.2f);
+		style.Colors[ImGuiCol_DragDropTarget] = ImVec4(r * 1.0f, g * 1.0f, b * 0.0f, 1.0f); // Yellow
+		style.Colors[ImGuiCol_NavHighlight] = ImVec4(r * 1.0f, g * 1.0f, b * 1.0f, 1.0f);
+		style.Colors[ImGuiCol_NavWindowingHighlight] = ImVec4(r * 1.0f, g * 1.0f, b * 1.0f, 1.0f);
+	}
 
 	// Renderer setup and GUI parameters.
 	m_minPathLength = 2;    // Minimum path length after which Russian Roulette path termination starts.
@@ -173,11 +146,8 @@ Application::Application(GLFWwindow* window,
 	m_brightness = 1.0f;
 
 	m_guiState = GUI_STATE_NONE;
-
 	m_isWindowVisible = true;
-
 	m_mouseSpeedRatio = 10.0f;
-
 	m_pinholeCamera.setViewport(m_width, m_height);
 
 	initOpenGL();
@@ -416,7 +386,7 @@ void Application::initRenderer()
 	try
 	{
 		m_context->setEntryPointCount(1); // 0 = render // Tonemapper is a GLSL shader in this case.
-		m_context->setRayTypeCount(1);    // 0 = radiance
+		m_context->setRayTypeCount(2);    // 0 = radiance and 1 = shadow ray
 
 		m_context->setStackSize(m_stackSize);
 		std::cout << "stackSize = " << m_stackSize << std::endl;
@@ -1036,6 +1006,36 @@ void Application::initPrograms()
 		// Material programs. There are only three Material nodes, opaque, cutout opacity and rectangle lights.
 		// For the radiance ray type 0:
 		m_mapOfPrograms["closesthit"] = m_context->createProgramFromPTXFile(ptxPath("closesthit.cu"), "closesthit");
+
+		Program prg;
+		
+		// BRDF Sampling function
+		m_bufferBRDFSample = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, EBrdfTypes::NUM_OF_BRDF);
+		int* brdfSample = (int*)m_bufferBRDFSample->map(0, RT_BUFFER_MAP_WRITE_DISCARD);
+		prg = m_context->createProgramFromPTXFile(ptxPath("lambert.cu"), "Sample");
+		brdfSample[EBrdfTypes::LAMBERT] = prg->getId();
+		m_bufferBRDFSample->unmap();
+		m_context["sysBRDFSample"]->setBuffer(m_bufferBRDFSample);
+
+		// BRDF Eval function
+		m_bufferBRDFEval = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, EBrdfTypes::NUM_OF_BRDF);
+		int* brdfEval = (int*)m_bufferBRDFEval->map(0, RT_BUFFER_MAP_WRITE_DISCARD);
+		prg = m_context->createProgramFromPTXFile(ptxPath("lambert.cu"), "Eval");
+		brdfEval[EBrdfTypes::LAMBERT] = prg->getId();
+		m_bufferBRDFEval->unmap();
+		m_context["sysBRDFEval"]->setBuffer(m_bufferBRDFEval);
+
+		// BRDF PDF function
+		m_bufferBRDFPdf = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, EBrdfTypes::NUM_OF_BRDF);
+		int* brdfPDF = (int*)m_bufferBRDFPdf->map(0, RT_BUFFER_MAP_WRITE_DISCARD);
+		prg = m_context->createProgramFromPTXFile(ptxPath("lambert.cu"), "PDF");
+		brdfPDF[EBrdfTypes::LAMBERT] = prg->getId();
+		m_bufferBRDFPdf->unmap();
+		m_context["sysBRDFPdf"]->setBuffer(m_bufferBRDFPdf);
+
+
+
+
 	}
 	catch (optix::Exception& e)
 	{

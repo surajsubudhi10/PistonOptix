@@ -7,6 +7,7 @@
 
 #include <optix.h>
 #include <optixu/optixu_math_namespace.h>
+#include <optixu/optixu_matrix_namespace.h>
 
 #include "rt_function.h"
 
@@ -81,11 +82,11 @@ struct TBN
 };
 
 
-//RT_FUNCTION float luminance(const optix::float3& rgb)
-//{
-//  const optix::float3 ntsc_luminance = { 0.30f, 0.59f, 0.11f };
-//  return optix::dot(rgb, ntsc_luminance);
-//}
+RT_FUNCTION float luminance(const optix::float3& rgb)
+{
+  const optix::float3 ntsc_luminance = { 0.30f, 0.59f, 0.11f };
+  return optix::dot(rgb, ntsc_luminance);
+}
 
 RT_FUNCTION float intensity(const optix::float3& rgb)
 {
@@ -209,6 +210,67 @@ RT_FUNCTION float balanceHeuristic(const float a, const float b)
 {
 	return a / (a + b);
 }
+
+
+/**
+* Orthonormal basis
+*/
+struct OrthoNormBasis
+{
+	__forceinline__ RT_HOSTDEVICE OrthoNormBasis(const float3& normal)
+	{
+		m_normal = normalize(normal);
+
+		if (dot(m_normal, make_float3(0.0f, 1.0f, 0.0f)) != 1.0f)
+		{
+			m_tangent = normalize(cross(m_normal, make_float3(0.0f, 1.0f, 0.0f)));
+		}
+		else
+		{
+			m_tangent = make_float3(1.0f, 0.0f, 0.0f);
+		}
+
+		m_binormal = cross(m_tangent, m_normal);
+
+
+		onbMat.setRow(0, m_tangent);
+		onbMat.setRow(1, m_binormal);
+		onbMat.setRow(2, m_normal);
+	}
+
+	__forceinline__ RT_HOSTDEVICE void ToBasisCoordinate(float3& p) const
+	{
+		p = onbMat * p;
+		//p = make_float3(dot(p, m_tangent), dot(p, m_binormal), dot(p, m_normal));
+	}
+
+	__forceinline__ RT_HOSTDEVICE void ToWorldCoordinate(float3& p) const
+	{
+		p = onbMat.transpose() * p;
+	}
+
+	// left hand coordinate frame
+	float3 m_tangent;    // x // u
+	float3 m_binormal;   // y // v
+	float3 m_normal;     // z // w
+
+	Matrix3x3 onbMat;
+};
+
+
+// Sampling
+RT_FUNCTION float3 UniformHemisphereSampling(float2 point) 
+{
+	float cosTheta = point.x;
+	float sinTheta = sqrtf(max(0.0f, 1.0f - cosTheta * cosTheta));
+
+	float phi = 2 * M_PI * point.y;
+	float cosPhi = cosf(phi);
+	float sinPhi = sinf(phi);
+
+	return make_float3(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
+}
+
 
 
 #endif // SHADER_COMMON_H
