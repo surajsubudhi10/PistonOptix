@@ -25,18 +25,28 @@ struct TBN
 	{
 		if (fabsf(normal.z) < fabsf(normal.x))
 		{
-			tangent.x = normal.z;
+			/*tangent.x = normal.z;
 			tangent.y = 0.0f;
-			tangent.z = -normal.x;
+			tangent.z = -normal.x;*/
+			bitangent.x = -normal.y;
+			bitangent.y = normal.x;
+			bitangent.z = 0;
 		}
 		else
 		{
-			tangent.x = 0.0f;
+			bitangent.x = 0;
+			bitangent.y = -normal.z;
+			bitangent.z = normal.y;
+			/*tangent.x = 0.0f;
 			tangent.y = normal.z;
-			tangent.z = -normal.y;
+			tangent.z = -normal.y;*/
 		}
-		tangent = optix::normalize(tangent);
-		bitangent = optix::cross(normal, tangent);
+
+		bitangent = optix::normalize(bitangent);
+		tangent = cross(bitangent, normal);
+
+		//tangent = optix::normalize(tangent);
+		//bitangent = optix::cross(normal, tangent);
 	}
 
 	// Constructor for cases where tangent, bitangent, and normal are given as ortho-normal basis.
@@ -271,6 +281,27 @@ RT_FUNCTION float3 UniformHemisphereSampling(float2 point)
 	return make_float3(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
 }
 
+RT_FUNCTION void AlignVector(float3 const& axis, float3& w)
+{
+	// Align w with axis.
+	const float s = copysign(1.0f, axis.z);
+	w.z *= s;
+	const float3 h = make_float3(axis.x, axis.y, axis.z + s);
+	const float  k = optix::dot(w, h) / (1.0f + fabsf(axis.z));
+	w = k * h - w;
+}
 
+RT_FUNCTION float3 UnitSquareToCosineHemisphere(const float2 sample)
+{
+	// Choose a point on the local hemisphere coordinates about +z.
+	const float theta = 2.0f * M_PIf * sample.x;
+	const float r = sqrtf(sample.y);
+	float x = r * cosf(theta);
+	float y = r * sinf(theta);
+	float z = 1.0f - x * x - y * y;
+	z = (0.0f < z) ? sqrtf(z) : 0.0f;
+
+	return make_float3(x, y, z);
+}
 
 #endif // SHADER_COMMON_H

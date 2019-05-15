@@ -35,35 +35,6 @@ rtBuffer< rtCallableProgramId<void(MaterialParameter &mat, State &state, PerRayD
 rtBuffer< rtCallableProgramId<float3(MaterialParameter &mat, State &state, PerRayData &prd)> > sysBRDFEval;
 
 
-// Helper functions for sampling a cosine weighted hemisphere distrobution as needed for the Lambert shading model.
-
-RT_FUNCTION void alignVector(float3 const& axis, float3& w)
-{
-	// Align w with axis.
-	const float s = copysign(1.0f, axis.z);
-	w.z *= s;
-	const float3 h = make_float3(axis.x, axis.y, axis.z + s);
-	const float  k = optix::dot(w, h) / (1.0f + fabsf(axis.z));
-	w = k * h - w;
-}
-
-RT_FUNCTION void unitSquareToCosineHemisphere(const float2 sample, float3 const& axis, float3& w, float& pdf)
-{
-	// Choose a point on the local hemisphere coordinates about +z.
-	const float theta = 2.0f * M_PIf * sample.x;
-	const float r = sqrtf(sample.y);
-	w.x = r * cosf(theta);
-	w.y = r * sinf(theta);
-	w.z = 1.0f - w.x * w.x - w.y * w.y;
-	w.z = (0.0f < w.z) ? sqrtf(w.z) : 0.0f;
-
-	pdf = w.z * M_1_PIf;
-
-	// Align with axis.
-	alignVector(axis, w);
-}
-
-
 RT_PROGRAM void closesthit()
 {
 	float3 geoNormal = optix::normalize(rtTransformNormal(RT_OBJECT_TO_WORLD, varGeoNormal));
@@ -96,7 +67,6 @@ RT_PROGRAM void closesthit()
 	thePrd.pdf = 0.0f;
 
 	MaterialParameter mat = sysMaterialParameters[parMaterialIndex];
-
 
 	// BRDF Sampling
 	sysBRDFSample[0](mat, state, thePrd);

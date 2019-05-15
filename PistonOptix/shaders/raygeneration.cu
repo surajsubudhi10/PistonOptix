@@ -29,9 +29,7 @@ using namespace optix;
 RT_FUNCTION void integrator(PerRayData& prd, float3& radiance)
 {
 	radiance = make_float3(0.0f);				// Start with black.
-
 	float3 throughput = make_float3(1.0f);		// The throughput for the next radiance, starts with 1.0f.
-
 	int depth = 0;								// Path segment index. Primary ray is 0.
 
 	while (depth < sysPathLengths.y)

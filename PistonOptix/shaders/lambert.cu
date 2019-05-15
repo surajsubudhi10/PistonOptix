@@ -18,16 +18,17 @@ RT_CALLABLE_PROGRAM void Sample(MaterialParameter &mat, State &state, PerRayData
 
 	float3 dir = UniformHemisphereSampling(rng2(prd.seed));
 
-	OrthoNormBasis shadingONB(N);
-	shadingONB.ToBasisCoordinate(wo);				// In Shading Coordinate
+	TBN onb(N);
+	//onb.transform(wo);
 
-	// if the viewer dir is opossite to surface normal (backface)
-	if (wo.z < 0.0f)
+	//if (wo.z < 0.0f)
+		//dir.z *= -1.0f;
+
+	if (dot(N, wo) < 0.0f)
 		dir.z *= -1.0f;
 
-	shadingONB.ToWorldCoordinate(dir);				// In World coordinate
-	
-	prd.hit_pos = state.hit_position;
+	//AlignVector(N, dir);
+	onb.inverse_transform(dir);
 	prd.wi = dir;
 }
 
