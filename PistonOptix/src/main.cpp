@@ -150,7 +150,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	GLFWwindow* window = glfwCreateWindow(windowWidth, windowHeight, "optixIntro_04 - Copyright (c) 2018 NVIDIA Corporation", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(windowWidth, windowHeight, "PistonOptix", nullptr, nullptr);
 	if (!window)
 	{
 		error_callback(2, "glfwCreateWindow() failed.");

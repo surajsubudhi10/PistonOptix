@@ -23,11 +23,8 @@ struct TBN
 	RT_FUNCTION TBN(const optix::float3& n)
 		: normal(n)
 	{
-		if (fabsf(normal.z) < fabsf(normal.x))
+		if (fabs(normal.x) > fabs(normal.z))
 		{
-			/*tangent.x = normal.z;
-			tangent.y = 0.0f;
-			tangent.z = -normal.x;*/
 			bitangent.x = -normal.y;
 			bitangent.y = normal.x;
 			bitangent.z = 0;
@@ -37,16 +34,10 @@ struct TBN
 			bitangent.x = 0;
 			bitangent.y = -normal.z;
 			bitangent.z = normal.y;
-			/*tangent.x = 0.0f;
-			tangent.y = normal.z;
-			tangent.z = -normal.y;*/
 		}
 
-		bitangent = optix::normalize(bitangent);
+		bitangent = normalize(bitangent);
 		tangent = cross(bitangent, normal);
-
-		//tangent = optix::normalize(tangent);
-		//bitangent = optix::cross(normal, tangent);
 	}
 
 	// Constructor for cases where tangent, bitangent, and normal are given as ortho-normal basis.
