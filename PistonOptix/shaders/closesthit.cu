@@ -35,6 +35,17 @@ rtBuffer< rtCallableProgramId<void(MaterialParameter &mat, State &state, PerRayD
 rtBuffer< rtCallableProgramId<float3(MaterialParameter &mat, State &state, PerRayData &prd)> > sysBRDFEval;
 
 
+RT_FUNCTION float sdot(float3 x, float3 y)
+{
+	return clamp(dot(x, y), 0.0f, 1.0f);
+}
+
+RT_FUNCTION float SmoothnessToPhongAlpha(float s)
+{
+	return pow(1000.0f, s * s);
+}
+
+
 RT_PROGRAM void closesthit()
 {
 	float3 geoNormal = optix::normalize(rtTransformNormal(RT_OBJECT_TO_WORLD, varGeoNormal));
@@ -69,30 +80,28 @@ RT_PROGRAM void closesthit()
 	MaterialParameter mat = sysMaterialParameters[parMaterialIndex];
 
 
-	//mat.albedo = optix::min(1.0f - mat.specular, mat.albedo);
+	float3 f = make_float3(0.0f, 0.0f, 0.0f);
+	mat.albedo = fminf(1.0f - mat.specular, mat.albedo);
 	float specChance = intensity(mat.specular);
 	float diffChance = intensity(mat.albedo);
-	float sum = specChance + diffChance;
-	specChance = specChance / sum;
-	diffChance = diffChance / sum;
-
-	float3 f = make_float3(0.0f, 0.0f, 0.0f);
 
 	// Roulette-select the ray's path
 	float roulette = rng(thePrd.seed);
-	if (roulette < specChance)
-	{
-		// Specular reflection
-		sysBRDFSample[1](mat, state, thePrd);
-		sysBRDFPdf[1](mat, state, thePrd);
-		f = sysBRDFEval[1](mat, state, thePrd) / specChance;
-	}
-	else
+	if (roulette < diffChance)
 	{
 		// Diffuse reflection
 		sysBRDFSample[0](mat, state, thePrd);
 		sysBRDFPdf[0](mat, state, thePrd);
 		f = sysBRDFEval[0](mat, state, thePrd) / diffChance;
+	}
+	else if(roulette < specChance + diffChance)
+	{
+		mat.roughness = SmoothnessToPhongAlpha(1 - mat.roughness);
+
+		// Specular reflection
+		sysBRDFSample[1](mat, state, thePrd);
+		sysBRDFPdf[1](mat, state, thePrd);
+		f = sysBRDFEval[1](mat, state, thePrd) / specChance;
 	}
 
 	// Do not sample opaque surfaces below the geometry!

@@ -857,7 +857,7 @@ void Application::guiWindow()
 					changed = true;
 				}
 
-				if (ImGui::DragFloat("Roughness", &parameters.roughness, 1.0f, 0.0f, 1000.0f))
+				if (ImGui::DragFloat("Roughness", &parameters.roughness, 0.01f, 0.0f, 1.0f))
 				{
 					changed = true;
 				}
@@ -1090,22 +1090,22 @@ void Application::initMaterials()
 	// Make all parameters white to show automatic ambient occlusion with a brute force full global illumination path tracer.
 	parameters.albedo = optix::make_float3(1.0f);
 	parameters.specular = optix::make_float3(1.0f);
-	parameters.roughness = 15.f;
+	parameters.roughness = 0.1f;
 	m_guiMaterialParameters.push_back(parameters); // 0, floor
 
 	parameters.albedo = optix::make_float3(0.0f);
 	parameters.specular = optix::make_float3(1.0f, 0.0f, 0.3f);
-	parameters.roughness = 15.f;
+	parameters.roughness = 0.5f;
 	m_guiMaterialParameters.push_back(parameters); // 1, box
 
 	parameters.albedo = optix::make_float3(1.0f);
 	parameters.specular = optix::make_float3(0.04f);
-	parameters.roughness = 15.0f;
+	parameters.roughness = 0.0f;
 	m_guiMaterialParameters.push_back(parameters); // 2, sphere
 
 	parameters.albedo = optix::make_float3(1.0f);
 	parameters.specular = optix::make_float3(1.0f);
-	parameters.roughness = 200.0f;
+	parameters.roughness = 1.0f;
 	m_guiMaterialParameters.push_back(parameters); // 3, torus
 
 	try

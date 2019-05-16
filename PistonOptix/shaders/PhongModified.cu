@@ -16,7 +16,7 @@ RT_CALLABLE_PROGRAM void PDF(MaterialParameter &mat, State &state, PerRayData &p
 	float alpha = mat.roughness;
 
 	bool sameHemisphere = cosTheta * dot(woWorld, N) > 0 ? true : false;
-	prd.pdf = sameHemisphere ? powf(fabsf(cosTheta), alpha) * M_2_PIf * (alpha + 1.0f) : 0.0f;			// Importance Sampling
+	prd.pdf = sameHemisphere ? satu(powf(fabsf(cosTheta), alpha)) * M_2_PIf * (alpha + 1.0f) : 0.0f;			// Importance Sampling
 }
 
 RT_CALLABLE_PROGRAM void Sample(MaterialParameter &mat, State &state, PerRayData &prd)
@@ -27,10 +27,10 @@ RT_CALLABLE_PROGRAM void Sample(MaterialParameter &mat, State &state, PerRayData
 	float3 wiWorld = reflect(-woWorld, N);
 	float3 dir = CosineWeightedHemisphereSampling(rng2(prd.seed), mat.roughness);
 
-	AlignVector(wiWorld, dir);
+	AlignVector(N, dir);
 
-	TBN onb(wiWorld);
-	prd.wi = dir;
+	TBN onb(N);
+	prd.wi = /*wiWorld;*/ dir;
 	//prd.wi = onb.inverse_transform(dir);
 }
 
