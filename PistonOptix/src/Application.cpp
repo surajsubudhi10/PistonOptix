@@ -110,7 +110,7 @@ Application::Application(GLFWwindow* window,
 
 	// Renderer setup and GUI parameters.
 	m_minPathLength = 2;    // Minimum path length after which Russian Roulette path termination starts.
-	m_maxPathLength = 2;    // Maximum path length. (Need at least 6 path segments to go through a glass sphere, hit something, and back through that sphere to the viewer.)
+	m_maxPathLength = 5;    // Maximum path length. (Need at least 6 path segments to go through a glass sphere, hit something, and back through that sphere to the viewer.)
 	m_sceneEpsilonFactor = 500;  // Factor on 1e-7 used to offset ray origins along the path to reduce self intersections. 
 
 	m_present = false;  // Update once per second. (The first half second shows all frames to get some initial accumulation).
@@ -544,20 +544,20 @@ bool Application::render()
 		}
 		else
 #endif
-			if (m_presentAtSecond < seconds)
-			{
-				m_presentAtSecond = ceil(seconds);
+		if (m_presentAtSecond < seconds)
+		{
+			m_presentAtSecond = ceil(seconds);
 
-				const double fps = double(m_iterationIndex) / seconds;
+			const double fps = double(m_iterationIndex) / seconds;
 
-				std::ostringstream stream;
-				stream.precision(3); // Precision is # digits in fraction part.
-				// m_iterationIndex has already been incremented for the last rendered frame, so it is the actual framecount here.
-				stream << std::fixed << m_iterationIndex << " / " << seconds << " = " << fps << " fps";
-				std::cout << stream.str() << std::endl;
+			std::ostringstream stream;
+			stream.precision(3); // Precision is # digits in fraction part.
+			// m_iterationIndex has already been incremented for the last rendered frame, so it is the actual framecount here.
+			stream << std::fixed << m_iterationIndex << " / " << seconds << " = " << fps << " fps";
+			std::cout << stream.str() << std::endl;
 
-				m_presentNext = true; // Present at least every second.
-			}
+			m_presentNext = true; // Present at least every second.
+		}
 	}
 	catch (optix::Exception& e)
 	{
@@ -851,6 +851,17 @@ void Application::guiWindow()
 				{
 					changed = true;
 				}
+
+				if (ImGui::ColorEdit3("Specular", (float*)&parameters.specular))
+				{
+					changed = true;
+				}
+
+				if (ImGui::DragFloat("Roughness", &parameters.roughness, 1.0f, 0.0f, 1000.0f))
+				{
+					changed = true;
+				}
+
 				ImGui::TreePop();
 			}
 		}
@@ -998,6 +1009,8 @@ void Application::initPrograms()
 		m_mapOfPrograms["exception"] = m_context->createProgramFromPTXFile(ptxPath("exception.cu"), "exception"); // entry point 0
 
 		m_mapOfPrograms["miss"] = m_context->createProgramFromPTXFile(ptxPath("miss.cu"), "miss_environment_constant"); // raytype 0
+		const std::string& texture_filename = std::string(sutil::samplesDir()) + "\\resources\\kiara_9_dusk_2k.hdr";
+		m_context["envmap"]->setTextureSampler(sutil::loadTexture(m_context, texture_filename, optix::make_float3(1.0f)));
 
 		// Geometry
 		m_mapOfPrograms["boundingbox_triangle_indexed"] = m_context->createProgramFromPTXFile(ptxPath("boundingbox_triangle_indexed.cu"), "boundingbox_triangle_indexed");
@@ -1014,6 +1027,8 @@ void Application::initPrograms()
 		int* brdfSample = (int*)m_bufferBRDFSample->map(0, RT_BUFFER_MAP_WRITE_DISCARD);
 		prg = m_context->createProgramFromPTXFile(ptxPath("lambert.cu"), "Sample");
 		brdfSample[EBrdfTypes::LAMBERT] = prg->getId();
+		prg = m_context->createProgramFromPTXFile(ptxPath("PhongModified.cu"), "Sample");
+		brdfSample[EBrdfTypes::PHONG] = prg->getId();
 		m_bufferBRDFSample->unmap();
 		m_context["sysBRDFSample"]->setBuffer(m_bufferBRDFSample);
 
@@ -1022,6 +1037,8 @@ void Application::initPrograms()
 		int* brdfEval = (int*)m_bufferBRDFEval->map(0, RT_BUFFER_MAP_WRITE_DISCARD);
 		prg = m_context->createProgramFromPTXFile(ptxPath("lambert.cu"), "Eval");
 		brdfEval[EBrdfTypes::LAMBERT] = prg->getId();
+		prg = m_context->createProgramFromPTXFile(ptxPath("PhongModified.cu"), "Eval");
+		brdfEval[EBrdfTypes::PHONG] = prg->getId();
 		m_bufferBRDFEval->unmap();
 		m_context["sysBRDFEval"]->setBuffer(m_bufferBRDFEval);
 
@@ -1030,6 +1047,8 @@ void Application::initPrograms()
 		int* brdfPDF = (int*)m_bufferBRDFPdf->map(0, RT_BUFFER_MAP_WRITE_DISCARD);
 		prg = m_context->createProgramFromPTXFile(ptxPath("lambert.cu"), "PDF");
 		brdfPDF[EBrdfTypes::LAMBERT] = prg->getId();
+		prg = m_context->createProgramFromPTXFile(ptxPath("PhongModified.cu"), "PDF");
+		brdfPDF[EBrdfTypes::PHONG] = prg->getId();
 		m_bufferBRDFPdf->unmap();
 		m_context["sysBRDFPdf"]->setBuffer(m_bufferBRDFPdf);
 
@@ -1056,6 +1075,8 @@ void Application::updateMaterialParameters()
 		MaterialParameterGUI& src = m_guiMaterialParameters[i];
 
 		dst->albedo = src.albedo;
+		dst->specular = src.specular;
+		dst->roughness = src.roughness;
 	}
 
 	m_bufferMaterialParameters->unmap();
@@ -1068,15 +1089,23 @@ void Application::initMaterials()
 
 	// Make all parameters white to show automatic ambient occlusion with a brute force full global illumination path tracer.
 	parameters.albedo = optix::make_float3(1.0f);
+	parameters.specular = optix::make_float3(1.0f);
+	parameters.roughness = 15.f;
 	m_guiMaterialParameters.push_back(parameters); // 0, floor
 
-	parameters.albedo = optix::make_float3(1.0f);
+	parameters.albedo = optix::make_float3(0.0f);
+	parameters.specular = optix::make_float3(1.0f, 0.0f, 0.3f);
+	parameters.roughness = 15.f;
 	m_guiMaterialParameters.push_back(parameters); // 1, box
 
 	parameters.albedo = optix::make_float3(1.0f);
+	parameters.specular = optix::make_float3(0.04f);
+	parameters.roughness = 15.0f;
 	m_guiMaterialParameters.push_back(parameters); // 2, sphere
 
 	parameters.albedo = optix::make_float3(1.0f);
+	parameters.specular = optix::make_float3(1.0f);
+	parameters.roughness = 200.0f;
 	m_guiMaterialParameters.push_back(parameters); // 3, torus
 
 	try
