@@ -189,6 +189,10 @@ RT_FUNCTION optix::float4 fmaxf(const float m, const optix::float4& v)
 	return optix::make_float4(::fmaxf(m, v.x), ::fmaxf(m, v.y), ::fmaxf(m, v.z), ::fmaxf(m, v.w));
 }
 
+RT_FUNCTION float satu(float val) 
+{
+	return clamp(val, 0.0f, 1.0f);
+}
 
 RT_FUNCTION bool isNull(const optix::float3& v)
 {
@@ -213,50 +217,15 @@ RT_FUNCTION float balanceHeuristic(const float a, const float b)
 }
 
 
-/**
-* Orthonormal basis
-*/
-struct OrthoNormBasis
+RT_FUNCTION void AlignVector(float3 const& axis, float3& w)
 {
-	__forceinline__ RT_HOSTDEVICE OrthoNormBasis(const float3& normal)
-	{
-		m_normal = normalize(normal);
-
-		if (dot(m_normal, make_float3(0.0f, 1.0f, 0.0f)) != 1.0f)
-		{
-			m_tangent = normalize(cross(m_normal, make_float3(0.0f, 1.0f, 0.0f)));
-		}
-		else
-		{
-			m_tangent = make_float3(1.0f, 0.0f, 0.0f);
-		}
-
-		m_binormal = cross(m_tangent, m_normal);
-
-
-		onbMat.setRow(0, m_tangent);
-		onbMat.setRow(1, m_binormal);
-		onbMat.setRow(2, m_normal);
-	}
-
-	__forceinline__ RT_HOSTDEVICE void ToBasisCoordinate(float3& p) const
-	{
-		p = onbMat * p;
-		//p = make_float3(dot(p, m_tangent), dot(p, m_binormal), dot(p, m_normal));
-	}
-
-	__forceinline__ RT_HOSTDEVICE void ToWorldCoordinate(float3& p) const
-	{
-		p = onbMat.transpose() * p;
-	}
-
-	// left hand coordinate frame
-	float3 m_tangent;    // x // u
-	float3 m_binormal;   // y // v
-	float3 m_normal;     // z // w
-
-	Matrix3x3 onbMat;
-};
+	// Align w with axis.
+	const float s = copysign(1.0f, axis.z);
+	w.z *= s;
+	const float3 h = make_float3(axis.x, axis.y, axis.z + s);
+	const float  k = optix::dot(w, h) / (1.0f + fabsf(axis.z));
+	w = k * h - w;
+}
 
 
 // Sampling
@@ -272,16 +241,6 @@ RT_FUNCTION float3 UniformHemisphereSampling(float2 point)
 	return make_float3(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
 }
 
-RT_FUNCTION void AlignVector(float3 const& axis, float3& w)
-{
-	// Align w with axis.
-	const float s = copysign(1.0f, axis.z);
-	w.z *= s;
-	const float3 h = make_float3(axis.x, axis.y, axis.z + s);
-	const float  k = optix::dot(w, h) / (1.0f + fabsf(axis.z));
-	w = k * h - w;
-}
-
 RT_FUNCTION float3 UnitSquareToCosineHemisphere(const float2 sample)
 {
 	// Choose a point on the local hemisphere coordinates about +z.
@@ -293,6 +252,18 @@ RT_FUNCTION float3 UnitSquareToCosineHemisphere(const float2 sample)
 	z = (0.0f < z) ? sqrtf(z) : 0.0f;
 
 	return make_float3(x, y, z);
+}
+
+RT_FUNCTION float3 CosineWeightedHemisphereSampling(float2 sample, float alpha) 
+{
+	const float cosTheta = powf((1.0f - sample.y), 1.0f / (alpha + 1.0f));
+	const float sinTheta = sqrtf(max(0.0f, 1.0f - cosTheta * cosTheta));
+
+	float phi = 2 * M_PI * sample.y;
+	float cosPhi = cosf(phi);
+	float sinPhi = sinf(phi);
+
+	return make_float3(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
 }
 
 #endif // SHADER_COMMON_H

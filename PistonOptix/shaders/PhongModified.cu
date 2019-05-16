@@ -12,9 +12,11 @@ RT_CALLABLE_PROGRAM void PDF(MaterialParameter &mat, State &state, PerRayData &p
 	float3 woWorld = -theRay.direction;					// In World Coordinate (viewer direction)
 	float3 wiWorld = prd.wi;
 
-	bool sameHemisphere = dot(wiWorld, N) * dot(woWorld, N) > 0 ? true : false;
-	prd.pdf = sameHemisphere ? fabsf(dot(wiWorld, N)) * M_1_PIf : 0.0f;			// Importance Sampling
-	// prd.pdf = 0.5f * M_1_PI; // (1 / 2PI)									// Uniform Sampling
+	float cosTheta = dot(wiWorld, N);
+	float alpha = mat.roughness;
+
+	bool sameHemisphere = cosTheta * dot(woWorld, N) > 0 ? true : false;
+	prd.pdf = sameHemisphere ? powf(fabsf(cosTheta), alpha) * M_2_PIf * (alpha + 1.0f) : 0.0f;			// Importance Sampling
 }
 
 RT_CALLABLE_PROGRAM void Sample(MaterialParameter &mat, State &state, PerRayData &prd)
@@ -22,20 +24,26 @@ RT_CALLABLE_PROGRAM void Sample(MaterialParameter &mat, State &state, PerRayData
 	float3 N = state.shading_normal;					// In World Coordinate
 	float3 woWorld = -theRay.direction;					// In World Coordinate (viewer direction)
 
-	float3 dir = UnitSquareToCosineHemisphere(rng2(prd.seed));
+	float3 wiWorld = reflect(-woWorld, N);
+	float3 dir = CosineWeightedHemisphereSampling(rng2(prd.seed), mat.roughness);
 
-	TBN onb(N);
-	float3 wo = onb.transform(woWorld);
+	AlignVector(wiWorld, dir);
 
-	if (wo.z < 0.0f)
-		dir.z *= -1.0f;
-
-	prd.wi = onb.inverse_transform(dir);
+	TBN onb(wiWorld);
+	prd.wi = dir;
+	//prd.wi = onb.inverse_transform(dir);
 }
 
 
 RT_CALLABLE_PROGRAM float3 Eval(MaterialParameter &mat, State &state, PerRayData &prd)
 {
+	float3 N = state.shading_normal;					// In World Coordinate
+	float3 woWorld = -theRay.direction;					// In World Coordinate (viewer direction)
+	float3 wiWorld = prd.wi;
+
+	float cosTheta = dot(wiWorld, N);
+	float alpha = mat.roughness;
+
 	// https://seblagarde.wordpress.com/2011/08/17/hello-world/
-	return mat.albedo * M_1_PIf;
+	return mat.specular * M_2_PIf * (alpha + 2.0f) * satu(powf(cosTheta, alpha));
 }

@@ -68,10 +68,32 @@ RT_PROGRAM void closesthit()
 
 	MaterialParameter mat = sysMaterialParameters[parMaterialIndex];
 
-	// BRDF Sampling
-	sysBRDFSample[0](mat, state, thePrd);
-	sysBRDFPdf[0](mat, state, thePrd);
-	float3 f = sysBRDFEval[0](mat, state, thePrd);
+
+	//mat.albedo = optix::min(1.0f - mat.specular, mat.albedo);
+	float specChance = intensity(mat.specular);
+	float diffChance = intensity(mat.albedo);
+	float sum = specChance + diffChance;
+	specChance = specChance / sum;
+	diffChance = diffChance / sum;
+
+	float3 f = make_float3(0.0f, 0.0f, 0.0f);
+
+	// Roulette-select the ray's path
+	float roulette = rng(thePrd.seed);
+	if (roulette < specChance)
+	{
+		// Specular reflection
+		sysBRDFSample[1](mat, state, thePrd);
+		sysBRDFPdf[1](mat, state, thePrd);
+		f = sysBRDFEval[1](mat, state, thePrd) / specChance;
+	}
+	else
+	{
+		// Diffuse reflection
+		sysBRDFSample[0](mat, state, thePrd);
+		sysBRDFPdf[0](mat, state, thePrd);
+		f = sysBRDFEval[0](mat, state, thePrd) / diffChance;
+	}
 
 	// Do not sample opaque surfaces below the geometry!
 	// Mind that the geometry normal has been flipped to the side the ray points at.
@@ -81,11 +103,6 @@ RT_PROGRAM void closesthit()
 		return;
 	}
 
-	// PERF Since the cosine-weighted hemisphere distribution is a perfect importance-sampling of the Lambert material,
-	// the whole term ((M_1_PIf * fabsf(optix::dot(prd.wi, normal)) / prd.pdf) is always 1.0f here!
+	
 	thePrd.f_over_pdf = f * fabsf(optix::dot(thePrd.wi, state.shading_normal)) / thePrd.pdf;
-
-	// This is a brute-force path tracer. There is no next event estimation (direct lighting) here.
-	// Note that because of that, the albedo affects the path throughput only.
-	// This material is not returning any radiance because it's not a light source.
 }
