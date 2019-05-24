@@ -113,7 +113,9 @@ private:
 	optix::Geometry createPlane(const int tessU, const int tessV, const int upAxis);
 	optix::Geometry createSphere(const int tessU, const int tessV, const float radius, const float maxTheta);
 	optix::Geometry createTorus(const int tessU, const int tessV, const float innerRadius, const float outerRadius);
+	optix::Geometry LoadOBJ(std::string objPath);
 
+	void createGeometryFromOBJ(std::string objPath, uint materialID, float* transform);
 	optix::Geometry createGeometry(std::vector<VertexAttributes> const& attributes, std::vector<unsigned int> const& indices);
 
 	void setAccelerationProperties(optix::Acceleration acceleration);

@@ -7,6 +7,9 @@
 #include <optixu/optixu_math_namespace.h>
 #include <optixu/optixu_matrix_namespace.h>
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
+
 #include <algorithm>
 #include <cstring>
 #include <iostream>
@@ -31,6 +34,22 @@ static std::string ptxPath(std::string const& cuda_file)
 		std::string(SAMPLE_NAME) + std::string("_generated_") + cuda_file + std::string(".ptx");
 }
 
+static std::string getFileName(const std::string& s) {
+
+	char sep = '/';
+
+#ifdef _WIN32
+	sep = '\\';
+#endif
+
+	size_t i = s.rfind(sep, s.length());
+	if (i != std::string::npos) 
+	{
+		return(s.substr(i + 1, s.length() - i));
+	}
+
+	return("");
+}
 
 Application::Application(GLFWwindow* window,
 	const int width,
@@ -611,7 +630,7 @@ void Application::checkInfoLog(const char *msg, GLuint object)
 	if (maxLength > 1)
 	{
 		infoLog = (GLchar *)malloc(maxLength);
-		if (infoLog != NULL)
+		if (infoLog != nullptr)
 		{
 			if (glIsShader(object))
 			{
@@ -954,6 +973,43 @@ void Application::guiEventHandler()
 }
 
 
+void Application::createGeometryFromOBJ(std::string objPath, uint materialID, float * transform)
+{
+	try
+	{
+		optix::Geometry geometry = LoadOBJ(objPath);
+
+		optix::GeometryInstance giGeo = m_context->createGeometryInstance(); // This connects Geometries with Materials.
+		giGeo->setGeometry(geometry);
+		giGeo->setMaterialCount(1);
+		giGeo->setMaterial(0, m_opaqueMaterial);
+		giGeo["parMaterialIndex"]->setInt(materialID); // This is all! This defines which material parameters in sysMaterialParametrers to use.
+
+		optix::Acceleration accGeo = m_context->createAcceleration(m_builder);
+		setAccelerationProperties(accGeo);
+
+		optix::GeometryGroup ggGeo = m_context->createGeometryGroup(); // This connects GeometryInstances with Acceleration structures. (All OptiX nodes with "Group" in the name hold an Acceleration.)
+		ggGeo->setAcceleration(accGeo);
+		ggGeo->setChildCount(1);
+		ggGeo->setChild(0, giGeo);
+
+		optix::Matrix4x4 matrixPlane(transform);
+
+		optix::Transform trGeo = m_context->createTransform();
+		trGeo->setChild(ggGeo);
+		trGeo->setMatrix(false, matrixPlane.getData(), matrixPlane.inverse().getData());
+
+		int count = m_rootGroup->getChildCount();
+		m_rootGroup->setChildCount(count + 1);
+		m_rootGroup->setChild(count, trGeo);
+
+	}
+	catch (optix::Exception& e)
+	{
+		std::cerr << e.getErrorString() << std::endl;
+	}
+}
+
 // This part is always identical in the generated geometry creation routines.
 optix::Geometry Application::createGeometry(std::vector<VertexAttributes> const& attributes, std::vector<unsigned int> const& indices)
 {
@@ -995,7 +1051,6 @@ optix::Geometry Application::createGeometry(std::vector<VertexAttributes> const&
 	return geometry;
 }
 
-
 void Application::initPrograms()
 {
 	try
@@ -1021,7 +1076,7 @@ void Application::initPrograms()
 		m_mapOfPrograms["closesthit"] = m_context->createProgramFromPTXFile(ptxPath("closesthit.cu"), "closesthit");
 
 		Program prg;
-		
+
 		// BRDF Sampling function
 		m_bufferBRDFSample = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, EBrdfTypes::NUM_OF_BRDF);
 		int* brdfSample = (int*)m_bufferBRDFSample->map(0, RT_BUFFER_MAP_WRITE_DISCARD);
@@ -1292,11 +1347,92 @@ void Application::createScene()
 		count = m_rootGroup->getChildCount();
 		m_rootGroup->setChildCount(count + 1);
 		m_rootGroup->setChild(count, trTorus);
+
+
+		float trafoOBJ[16] =
+		{
+		  1.0f, 0.0f, 0.0f, 2.5f,  // Move it to the right of the sphere.
+		  0.0f, 1.0f, 0.0f, 1.25f, // The torus has an outer radius of 0.5f. Move it above the floor plane.
+		  0.0f, 0.0f, 1.0f, 3.0f,
+		  0.0f, 0.0f, 0.0f, 1.0f
+		};
+
+		std::string objFilepath = std::string(sutil::samplesDir()) + "\\resources\\Models\\OBJFiles\\ShaderBall\\ShaderballCoreGrp.obj";
+		createGeometryFromOBJ(objFilepath, 1, trafoOBJ);
+
 	}
 	catch (optix::Exception& e)
 	{
 		std::cerr << e.getErrorString() << std::endl;
 	}
+}
+
+optix::Geometry Application::LoadOBJ(std::string inputfile)
+{
+	std::vector<VertexAttributes> attributes;
+	std::vector<unsigned int> indicies;
+
+	//std::string inputfile = "cornell_box.obj";
+	tinyobj::attrib_t attrib;
+	std::vector<tinyobj::shape_t> shapes;
+	std::vector<tinyobj::material_t> materials;
+
+	std::string err;
+	//bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, inputfile.c_str());
+	bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, inputfile.c_str());
+
+	if (!err.empty() && err[0] != 'W') { // `err` may contain warning message.
+		std::cerr << err << std::endl;
+	}
+
+	if (!ret) {
+		exit(1);
+	}
+
+	// Loop over shapes
+	for (size_t s = 0; s < shapes.size(); s++) {
+		// Loop over faces(polygon)
+		size_t index_offset = 0;
+		for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++)
+		{
+			int fv = shapes[s].mesh.num_face_vertices[f];
+
+			// Loop over vertices in the face.
+			for (size_t v = 0; v < fv; v++) {
+				// access to vertex
+				tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
+				VertexAttributes singleVertexData;
+
+				tinyobj::real_t vx = attrib.vertices[3 * idx.vertex_index + 0];
+				tinyobj::real_t vy = attrib.vertices[3 * idx.vertex_index + 1];
+				tinyobj::real_t vz = attrib.vertices[3 * idx.vertex_index + 2];
+				tinyobj::real_t nx = attrib.normals[3 * idx.normal_index + 0];
+				tinyobj::real_t ny = attrib.normals[3 * idx.normal_index + 1];
+				tinyobj::real_t nz = attrib.normals[3 * idx.normal_index + 2];
+				tinyobj::real_t tx = attrib.texcoords[2 * idx.texcoord_index + 0];
+				tinyobj::real_t ty = attrib.texcoords[2 * idx.texcoord_index + 1];
+
+				singleVertexData.vertex = optix::make_float3(vx, vy, vz);
+				singleVertexData.normal = optix::make_float3(nx, ny, nz);
+
+				attributes.push_back(singleVertexData);
+				indicies.push_back((unsigned int)(index_offset + v));
+				// Optional: vertex colors
+				// tinyobj::real_t red = attrib.colors[3*idx.vertex_index+0];
+				// tinyobj::real_t green = attrib.colors[3*idx.vertex_index+1];
+				// tinyobj::real_t blue = attrib.colors[3*idx.vertex_index+2];
+			}
+			index_offset += fv;
+
+			// per-face material
+			shapes[s].mesh.material_ids[f];
+		}
+	}
+
+
+	std::cout << "LoadOBJ(" << getFileName(inputfile) << "): Vertices = " << attributes.size() << ", Triangles = " << indicies.size() / 3 << std::endl;
+
+	return createGeometry(attributes, indicies);
 }
 
 
