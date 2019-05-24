@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
 	int  stackSize = 1024;  // Command line parameter just to be able to find the smallest working size.
 	std::string environment = std::string(sutil::samplesDir()) + "/data/NV_Default_HDR_3000x1500.hdr";
 
-	std::string filenameScreenshot;
+	std::string filenameScreenshot = "PistonOptix.png";
 	bool hasGUI = true;
 
 	// Parse the command line parameters.

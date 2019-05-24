@@ -8,6 +8,7 @@
 #include <optixu/optixu_matrix_namespace.h>
 
 #define TINYOBJLOADER_IMPLEMENTATION
+//#include <tinyobjloader\tiny_obj_loader.h>
 #include <tiny_obj_loader.h>
 
 #include <algorithm>
@@ -1231,9 +1232,9 @@ void Application::createScene()
 		// Scale the plane to go from -8 to 8.
 		float trafoPlane[16] =
 		{
-		  8.0f, 0.0f, 0.0f, 0.0f,
-		  0.0f, 8.0f, 0.0f, 0.0f,
-		  0.0f, 0.0f, 8.0f, 0.0f,
+		  18.0f, 0.0f, 0.0f, 0.0f,
+		  0.0f, 18.0f, 0.0f, 0.0f,
+		  0.0f, 0.0f, 18.0f, 0.0f,
 		  0.0f, 0.0f, 0.0f, 1.0f
 		};
 		optix::Matrix4x4 matrixPlane(trafoPlane);
@@ -1246,119 +1247,18 @@ void Application::createScene()
 		m_rootGroup->setChildCount(count + 1);
 		m_rootGroup->setChild(count, trPlane);
 
-		// Add a box (no tessellation here, using just 12 triangles)
-		optix::Geometry geoBox = createBox();
-
-		optix::GeometryInstance giBox = m_context->createGeometryInstance();
-		giBox->setGeometry(geoBox);
-		giBox->setMaterialCount(1);
-		giBox->setMaterial(0, m_opaqueMaterial);
-		giBox["parMaterialIndex"]->setInt(1); // Using parameters in sysMaterialParameters[1].
-
-		optix::Acceleration accBox = m_context->createAcceleration(m_builder);
-		setAccelerationProperties(accBox);
-
-		optix::GeometryGroup ggBox = m_context->createGeometryGroup();
-		ggBox->setAcceleration(accBox);
-		ggBox->setChildCount(1);
-		ggBox->setChild(0, giBox);
-
-		float trafoBox[16] =
-		{
-		  1.0f, 0.0f, 0.0f, -2.5f, // Move to the left.
-		  0.0f, 1.0f, 0.0f, 1.25f, // The box is modeled with unit coordinates in the range [-1, 1], Move it above the floor plane.
-		  0.0f, 0.0f, 1.0f, 0.0f,
-		  0.0f, 0.0f, 0.0f, 1.0f
-		};
-		optix::Matrix4x4 matrixBox(trafoBox);
-
-		optix::Transform trBox = m_context->createTransform();
-		trBox->setChild(ggBox);
-		trBox->setMatrix(false, matrixBox.getData(), matrixBox.inverse().getData());
-
-		count = m_rootGroup->getChildCount();
-		m_rootGroup->setChildCount(count + 1);
-		m_rootGroup->setChild(count, trBox);
-
-		// Add a tessellated sphere with 180 longitudes and 90 latitudes, radius 1.0f and fully closed at the upper pole.
-		optix::Geometry geoSphere = createSphere(180, 90, 1.0f, M_PIf);
-
-		optix::GeometryInstance giSphere = m_context->createGeometryInstance();
-		giSphere->setGeometry(geoSphere);
-		giSphere->setMaterialCount(1);
-		giSphere->setMaterial(0, m_opaqueMaterial);
-		giSphere["parMaterialIndex"]->setInt(2); // Using parameters in sysMaterialParameters[2].
-
-		optix::Acceleration accSphere = m_context->createAcceleration(m_builder);
-		setAccelerationProperties(accSphere);
-
-		optix::GeometryGroup ggSphere = m_context->createGeometryGroup();
-		ggSphere->setAcceleration(accSphere);
-		ggSphere->setChildCount(1);
-		ggSphere->setChild(0, giSphere);
-
-		float trafoSphere[16] =
-		{
-		  1.0f, 0.0f, 0.0f, 0.0f,  // In the center, to the right of the box.
-		  0.0f, 1.0f, 0.0f, 1.25f, // The sphere is modeled with radius 1.0f. Move it above the floor plane to show shadows.
-		  0.0f, 0.0f, 1.0f, 0.0f,
-		  0.0f, 0.0f, 0.0f, 1.0f
-		};
-		optix::Matrix4x4 matrixSphere(trafoSphere);
-
-		optix::Transform trSphere = m_context->createTransform();
-		trSphere->setChild(ggSphere);
-		trSphere->setMatrix(false, matrixSphere.getData(), matrixSphere.inverse().getData());
-
-		count = m_rootGroup->getChildCount();
-		m_rootGroup->setChildCount(count + 1);
-		m_rootGroup->setChild(count, trSphere);
-
-		// Add a torus. 
-		optix::Geometry geoTorus = createTorus(180, 180, 0.75f, 0.25f);
-
-		optix::GeometryInstance giTorus = m_context->createGeometryInstance();
-		giTorus->setGeometry(geoTorus);
-		giTorus->setMaterialCount(1);
-		giTorus->setMaterial(0, m_opaqueMaterial);
-		giTorus["parMaterialIndex"]->setInt(3); // Using parameters in sysMaterialParameters[3].
-
-		optix::Acceleration accTorus = m_context->createAcceleration(m_builder);
-		setAccelerationProperties(accTorus);
-
-		optix::GeometryGroup ggTorus = m_context->createGeometryGroup();
-		ggTorus->setAcceleration(accTorus);
-		ggTorus->setChildCount(1);
-		ggTorus->setChild(0, giTorus);
-
-		float trafoTorus[16] =
-		{
-		  1.0f, 0.0f, 0.0f, 2.5f,  // Move it to the right of the sphere.
-		  0.0f, 1.0f, 0.0f, 1.25f, // The torus has an outer radius of 0.5f. Move it above the floor plane.
-		  0.0f, 0.0f, 1.0f, 0.0f,
-		  0.0f, 0.0f, 0.0f, 1.0f
-		};
-		optix::Matrix4x4 matrixTorus(trafoTorus);
-
-		optix::Transform trTorus = m_context->createTransform();
-		trTorus->setChild(ggTorus);
-		trTorus->setMatrix(false, matrixTorus.getData(), matrixTorus.inverse().getData());
-
-		count = m_rootGroup->getChildCount();
-		m_rootGroup->setChildCount(count + 1);
-		m_rootGroup->setChild(count, trTorus);
-
-
 		float trafoOBJ[16] =
 		{
-		  1.0f, 0.0f, 0.0f, 2.5f,  // Move it to the right of the sphere.
-		  0.0f, 1.0f, 0.0f, 1.25f, // The torus has an outer radius of 0.5f. Move it above the floor plane.
-		  0.0f, 0.0f, 1.0f, 3.0f,
+		  1.0f, 0.0f, 0.0f, /*tx*/0.0f,  
+		  0.0f, 1.0f, 0.0f, /*ty*/0.0f,
+		  0.0f, 0.0f, 1.0f, /*tz*/3.0f,
 		  0.0f, 0.0f, 0.0f, 1.0f
 		};
 
-		std::string objFilepath = std::string(sutil::samplesDir()) + "\\resources\\Models\\OBJFiles\\ShaderBall\\ShaderballCoreGrp.obj";
-		createGeometryFromOBJ(objFilepath, 1, trafoOBJ);
+		std::string objMatFilepath = std::string(sutil::samplesDir()) + "\\resources\\Models\\OBJFiles\\ShaderBall\\BallMainCentMatL1.obj";
+		std::string objStandFilepath = std::string(sutil::samplesDir()) + "\\resources\\Models\\OBJFiles\\ShaderBall\\BallStandCentMatL1.obj";
+		createGeometryFromOBJ(objMatFilepath, 2, trafoOBJ);
+		createGeometryFromOBJ(objStandFilepath, 1, trafoOBJ);
 
 	}
 	catch (optix::Exception& e)
@@ -1367,30 +1267,31 @@ void Application::createScene()
 	}
 }
 
+
 optix::Geometry Application::LoadOBJ(std::string inputfile)
 {
 	std::vector<VertexAttributes> attributes;
 	std::vector<unsigned int> indicies;
 
-	//std::string inputfile = "cornell_box.obj";
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
 	std::vector<tinyobj::material_t> materials;
 
 	std::string err;
-	//bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, inputfile.c_str());
 	bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, inputfile.c_str());
 
 	if (!err.empty() && err[0] != 'W') { // `err` may contain warning message.
 		std::cerr << err << std::endl;
 	}
 
-	if (!ret) {
+	if (!ret)
 		exit(1);
-	}
+
 
 	// Loop over shapes
-	for (size_t s = 0; s < shapes.size(); s++) {
+	size_t numOfIndicesInShape = 0;
+	for (size_t s = 0; s < shapes.size(); s++) 
+	{
 		// Loop over faces(polygon)
 		size_t index_offset = 0;
 		for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++)
@@ -1398,7 +1299,8 @@ optix::Geometry Application::LoadOBJ(std::string inputfile)
 			int fv = shapes[s].mesh.num_face_vertices[f];
 
 			// Loop over vertices in the face.
-			for (size_t v = 0; v < fv; v++) {
+			for (size_t v = 0; v < fv; v++) 
+			{
 				// access to vertex
 				tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
 				VertexAttributes singleVertexData;
@@ -1409,14 +1311,22 @@ optix::Geometry Application::LoadOBJ(std::string inputfile)
 				tinyobj::real_t nx = attrib.normals[3 * idx.normal_index + 0];
 				tinyobj::real_t ny = attrib.normals[3 * idx.normal_index + 1];
 				tinyobj::real_t nz = attrib.normals[3 * idx.normal_index + 2];
-				tinyobj::real_t tx = attrib.texcoords[2 * idx.texcoord_index + 0];
-				tinyobj::real_t ty = attrib.texcoords[2 * idx.texcoord_index + 1];
+
+				tinyobj::real_t tx = 0.0f;
+				tinyobj::real_t ty = 1.0f;
+				if (idx.texcoord_index != -1) 
+				{
+					tx = attrib.texcoords[2 * idx.texcoord_index + 0];
+					ty = attrib.texcoords[2 * idx.texcoord_index + 1];
+				}
 
 				singleVertexData.vertex = optix::make_float3(vx, vy, vz);
 				singleVertexData.normal = optix::make_float3(nx, ny, nz);
+				singleVertexData.texcoord = optix::make_float3(tx, ty, 0.0f);
 
 				attributes.push_back(singleVertexData);
-				indicies.push_back((unsigned int)(index_offset + v));
+				indicies.push_back((unsigned int)(numOfIndicesInShape + index_offset + v));
+
 				// Optional: vertex colors
 				// tinyobj::real_t red = attrib.colors[3*idx.vertex_index+0];
 				// tinyobj::real_t green = attrib.colors[3*idx.vertex_index+1];
@@ -1427,14 +1337,12 @@ optix::Geometry Application::LoadOBJ(std::string inputfile)
 			// per-face material
 			shapes[s].mesh.material_ids[f];
 		}
+		numOfIndicesInShape += index_offset;
 	}
 
-
 	std::cout << "LoadOBJ(" << getFileName(inputfile) << "): Vertices = " << attributes.size() << ", Triangles = " << indicies.size() / 3 << std::endl;
-
 	return createGeometry(attributes, indicies);
 }
-
 
 void Application::setAccelerationProperties(optix::Acceleration acceleration)
 {
