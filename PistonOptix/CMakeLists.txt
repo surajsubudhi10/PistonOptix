@@ -44,5 +44,6 @@ OPTIX_add_sample_executable( PistonOptix
 
 include_directories(
   "."
+  "./inc/tiny_obj_loader"
 )
 
