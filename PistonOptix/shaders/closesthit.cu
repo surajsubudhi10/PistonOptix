@@ -79,30 +79,47 @@ RT_PROGRAM void closesthit()
 
 	MaterialParameter mat = sysMaterialParameters[parMaterialIndex];
 
+	float3 baseColor = mat.albedo;
+	float metallic = mat.metallic;
+	float roughness = max(0.001f, mat.roughness);
 
-	float3 f = make_float3(0.0f, 0.0f, 0.0f);
-	mat.albedo = fminf(1.0f - mat.specular, mat.albedo);
-	float specChance = intensity(mat.specular);
-	float diffChance = intensity(mat.albedo);
+	float3 dielectricSpecular = make_float3(0.04f, 0.04f, 0.04f);
+	float3 diffuseCol = lerp(baseColor * (1.0f - dielectricSpecular.x), make_float3(0.0f, 0.0f, 0.0f), metallic);
+	float3 F0 = lerp(dielectricSpecular, baseColor, metallic);
+
+	//float alpha = roughness * roughness;
+
+	float3 diffuseBRDF = make_float3(0.0f);
+	float3 specularBRDF = make_float3(0.0f);
+
+	float diffChance = intensity(baseColor);
 
 	// Roulette-select the ray's path
 	float roulette = rng(thePrd.seed);
-	if (roulette < diffChance)
+	if (roulette < diffChance) 
 	{
 		// Diffuse reflection
-		sysBRDFSample[0](mat, state, thePrd);
-		sysBRDFPdf[0](mat, state, thePrd);
-		f = sysBRDFEval[0](mat, state, thePrd) / diffChance;
+		sysBRDFSample[EBrdfTypes::LAMBERT](mat, state, thePrd);
+		sysBRDFPdf[EBrdfTypes::LAMBERT](mat, state, thePrd);
+		diffuseBRDF = sysBRDFEval[EBrdfTypes::LAMBERT](mat, state, thePrd);
 	}
-	else if(roulette < specChance + diffChance)
+	else
 	{
-		mat.roughness = SmoothnessToPhongAlpha(1 - mat.roughness);
-
 		// Specular reflection
-		sysBRDFSample[1](mat, state, thePrd);
-		sysBRDFPdf[1](mat, state, thePrd);
-		f = sysBRDFEval[1](mat, state, thePrd) / specChance;
+		sysBRDFSample[EBrdfTypes::MICROFACET](mat, state, thePrd);
+		sysBRDFPdf[EBrdfTypes::MICROFACET](mat, state, thePrd);
+		specularBRDF = sysBRDFEval[EBrdfTypes::MICROFACET](mat, state, thePrd);
 	}
+
+	float3 wiWorld = thePrd.wi;
+	float3 woWorld = -theRay.direction;
+	//float3 N = state.shading_normal;
+	float3 H = normalize(woWorld + wiWorld);
+
+
+	float3 F = F0 + (1.0f - F0) * powf(1.0f - dot(woWorld, H), 5.0f);
+	float3 f = (1.0f - F) * diffuseBRDF + specularBRDF;
+	
 
 	// Do not sample opaque surfaces below the geometry!
 	// Mind that the geometry normal has been flipped to the side the ray points at.

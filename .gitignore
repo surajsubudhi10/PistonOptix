@@ -9,3 +9,5 @@
 /support/glfw/COPYING.txt
 /support/glfw/README.md
 /.vs
+resources/Models/OBJFiles/ShaderBall/testBall.mtl
+resources/Models/OBJFiles/ShaderBall/testBall.obj

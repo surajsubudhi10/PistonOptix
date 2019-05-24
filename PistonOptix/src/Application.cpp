@@ -882,6 +882,11 @@ void Application::guiWindow()
 					changed = true;
 				}
 
+				if (ImGui::DragFloat("Metallic", &parameters.metallic, 0.01f, 0.0f, 1.0f))
+				{
+					changed = true;
+				}
+
 				ImGui::TreePop();
 			}
 		}
@@ -1085,6 +1090,8 @@ void Application::initPrograms()
 		brdfSample[EBrdfTypes::LAMBERT] = prg->getId();
 		prg = m_context->createProgramFromPTXFile(ptxPath("PhongModified.cu"), "Sample");
 		brdfSample[EBrdfTypes::PHONG] = prg->getId();
+		prg = m_context->createProgramFromPTXFile(ptxPath("MicrofacetSpecular.cu"), "Sample");
+		brdfSample[EBrdfTypes::MICROFACET] = prg->getId();
 		m_bufferBRDFSample->unmap();
 		m_context["sysBRDFSample"]->setBuffer(m_bufferBRDFSample);
 
@@ -1095,6 +1102,8 @@ void Application::initPrograms()
 		brdfEval[EBrdfTypes::LAMBERT] = prg->getId();
 		prg = m_context->createProgramFromPTXFile(ptxPath("PhongModified.cu"), "Eval");
 		brdfEval[EBrdfTypes::PHONG] = prg->getId();
+		prg = m_context->createProgramFromPTXFile(ptxPath("MicrofacetSpecular.cu"), "Eval");
+		brdfEval[EBrdfTypes::MICROFACET] = prg->getId();
 		m_bufferBRDFEval->unmap();
 		m_context["sysBRDFEval"]->setBuffer(m_bufferBRDFEval);
 
@@ -1105,6 +1114,8 @@ void Application::initPrograms()
 		brdfPDF[EBrdfTypes::LAMBERT] = prg->getId();
 		prg = m_context->createProgramFromPTXFile(ptxPath("PhongModified.cu"), "PDF");
 		brdfPDF[EBrdfTypes::PHONG] = prg->getId();
+		prg = m_context->createProgramFromPTXFile(ptxPath("MicrofacetSpecular.cu"), "PDF");
+		brdfPDF[EBrdfTypes::MICROFACET] = prg->getId();
 		m_bufferBRDFPdf->unmap();
 		m_context["sysBRDFPdf"]->setBuffer(m_bufferBRDFPdf);
 
@@ -1132,6 +1143,7 @@ void Application::updateMaterialParameters()
 
 		dst->albedo = src.albedo;
 		dst->specular = src.specular;
+		dst->metallic = src.metallic;
 		dst->roughness = src.roughness;
 	}
 
@@ -1147,21 +1159,25 @@ void Application::initMaterials()
 	parameters.albedo = optix::make_float3(1.0f);
 	parameters.specular = optix::make_float3(1.0f);
 	parameters.roughness = 0.1f;
+	parameters.metallic = 0.0f;
 	m_guiMaterialParameters.push_back(parameters); // 0, floor
 
 	parameters.albedo = optix::make_float3(0.0f);
 	parameters.specular = optix::make_float3(1.0f, 0.0f, 0.3f);
 	parameters.roughness = 0.5f;
+	parameters.metallic = 0.0f;
 	m_guiMaterialParameters.push_back(parameters); // 1, box
 
 	parameters.albedo = optix::make_float3(1.0f);
 	parameters.specular = optix::make_float3(0.04f);
 	parameters.roughness = 0.0f;
+	parameters.metallic = 0.0f;
 	m_guiMaterialParameters.push_back(parameters); // 2, sphere
 
 	parameters.albedo = optix::make_float3(1.0f);
 	parameters.specular = optix::make_float3(1.0f);
 	parameters.roughness = 1.0f;
+	parameters.metallic = 0.0f;
 	m_guiMaterialParameters.push_back(parameters); // 3, torus
 
 	try

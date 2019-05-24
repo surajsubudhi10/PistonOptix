@@ -63,6 +63,7 @@ struct MaterialParameterGUI
 {
 	optix::float3 albedo; // albedo, color, tint, throughput change for specular materials.
 	optix::float3 specular;
+	float metallic;
 	float roughness;
 };
 

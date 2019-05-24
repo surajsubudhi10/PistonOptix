@@ -7,6 +7,7 @@ enum EBrdfTypes
 {
 	LAMBERT,
 	PHONG,
+	MICROFACET,
 
 	NUM_OF_BRDF
 };
@@ -17,9 +18,8 @@ struct MaterialParameter
 {
 	optix::float3 albedo;     // albedo, color, tint, throughput change for specular surfaces. Pick your meaning.
 	optix::float3 specular;
+	float metallic;
 	float roughness;
-	// Manual padding to 16-byte alignment goes here.
-	float unused0;
 };
 
 #endif // MATERIAL_PARAMETER_H
