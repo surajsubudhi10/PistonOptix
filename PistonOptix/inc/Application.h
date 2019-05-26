@@ -62,7 +62,6 @@ enum GuiState
 struct MaterialParameterGUI
 {
 	optix::float3 albedo; // albedo, color, tint, throughput change for specular materials.
-	optix::float3 specular;
 	float metallic;
 	float roughness;
 };
@@ -84,7 +83,7 @@ public:
 	void reshape(int width, int height);
 
 	bool render();
-	void display();
+	void display() const;
 
 	void screenshot(std::string const& filename);
 
@@ -93,10 +92,10 @@ public:
 	void guiEventHandler();
 	void guiRender();
 
-	void guiReferenceManual(); // DAR HACK DEBUG The IMGUI "programming manual" in form of a live window.
+	static void guiReferenceManual(); // DAR HACK DEBUG The IMGUI "programming manual" in form of a live window.
 
 private:
-	void getSystemInformation();
+	static void getSystemInformation();
 
 	void initOpenGL();
 	void checkInfoLog(const char *msg, GLuint object);
@@ -189,6 +188,7 @@ private:
 	float         m_crushBlacks;
 	float         m_saturation;
 	float         m_brightness;
+	bool		  m_useTonermapper;
 
 	GuiState m_guiState;
 

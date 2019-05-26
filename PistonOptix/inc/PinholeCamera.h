@@ -25,8 +25,10 @@ public:
 	void focus(int x, int y);
 	void zoom(float x);
 
-	bool  getFrustum(optix::float3& pos, optix::float3& u, optix::float3& v, optix::float3& w);
+	bool  getFrustum(optix::float3& pos, optix::float3& u, optix::float3& v, optix::float3& w, bool isCameraChanged = false);
 	float getAspectRatio() const;
+	void  getCameraVariables() const;
+	void  setCameraVariables(const optix::float3& center, float phi, float theta, float distance);
 
 public: // Just to be able to load and save them easily.
 	optix::float3 m_center;   // Center of interest point, around which is orbited (and the sharp plane of a depth of field camera).

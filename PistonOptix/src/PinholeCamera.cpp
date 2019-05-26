@@ -147,9 +147,19 @@ float PinholeCamera::getAspectRatio() const
 	return m_aspect;
 }
 
-bool PinholeCamera::getFrustum(optix::float3& pos, optix::float3& u, optix::float3& v, optix::float3& w)
+void PinholeCamera::getCameraVariables() const
 {
-	bool changed = m_changed;
+	printf("Cam Phi : %f\n", m_phi);
+	printf("Cam Theta : %f\n", m_theta);
+	printf("Cam Distance : %f\n", m_distance);
+	printf("Cam Aspect ratio : %f\n", m_aspect);
+	printf("Cam FOV : %f\n", m_fov);
+	printf("Cam Center : %f, %f, %f \n", m_center.x, m_center.y, m_center.z);
+}
+
+bool PinholeCamera::getFrustum(optix::float3& pos, optix::float3& u, optix::float3& v, optix::float3& w, bool isCameraChanged)
+{
+	bool changed = m_changed || isCameraChanged;
 	if (changed)
 	{
 		// Recalculate the camera parameters.
@@ -175,6 +185,15 @@ bool PinholeCamera::getFrustum(optix::float3& pos, optix::float3& u, optix::floa
 		m_changed = false; // Next time asking for the frustum will return false unless the camera has changed again.
 	}
 	return changed;
+}
+
+void PinholeCamera::setCameraVariables(const optix::float3& center, float phi, float theta, float distance)
+{
+	m_center = center;
+	m_distance = distance;
+	m_phi = phi;
+	m_theta = theta;
+	m_changed = true;
 }
 
 bool PinholeCamera::setDelta(int x, int y)

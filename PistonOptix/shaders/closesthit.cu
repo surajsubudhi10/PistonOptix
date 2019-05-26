@@ -81,13 +81,11 @@ RT_PROGRAM void closesthit()
 
 	float3 baseColor = mat.albedo;
 	float metallic = mat.metallic;
-	float roughness = max(0.001f, mat.roughness);
+	//float roughness = max(0.001f, mat.roughness);
 
 	float3 dielectricSpecular = make_float3(0.04f, 0.04f, 0.04f);
-	float3 diffuseCol = lerp(baseColor * (1.0f - dielectricSpecular.x), make_float3(0.0f, 0.0f, 0.0f), metallic);
+	//float3 diffuseCol = lerp(baseColor * (1.0f - dielectricSpecular.x), make_float3(0.0f, 0.0f, 0.0f), metallic);
 	float3 F0 = lerp(dielectricSpecular, baseColor, metallic);
-
-	//float alpha = roughness * roughness;
 
 	float3 diffuseBRDF = make_float3(0.0f);
 	float3 specularBRDF = make_float3(0.0f);

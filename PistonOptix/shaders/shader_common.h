@@ -189,6 +189,11 @@ RT_FUNCTION optix::float4 fmaxf(const float m, const optix::float4& v)
 	return optix::make_float4(::fmaxf(m, v.x), ::fmaxf(m, v.y), ::fmaxf(m, v.z), ::fmaxf(m, v.w));
 }
 
+RT_FUNCTION optix::float3 fpowf(const optix::float3& u, const optix::float3& v)
+{
+	return make_float3(powf(u.x, v.x), powf(u.y, v.y), powf(u.z, v.z));
+}
+
 RT_FUNCTION float satu(float val) 
 {
 	return clamp(val, 0.0f, 1.0f);

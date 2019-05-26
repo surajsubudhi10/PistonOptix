@@ -44,5 +44,7 @@
 // 1 == Enable  all OptiX exceptions, rtPrintfs and rtAssert functionality. (Really only for debugging, big performance hit!)
 #define USE_DEBUG_EXCEPTIONS 0
 
+#define USE_SHADER_TONEMAP 0
+
 
 #endif // APP_CONFIG_H

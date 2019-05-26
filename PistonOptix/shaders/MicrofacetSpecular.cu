@@ -20,7 +20,7 @@ RT_CALLABLE_PROGRAM void PDF(MaterialParameter &mat, State &state, PerRayData &p
 	
 	float pdf = alphaSqr * cosTheta * sinTheta / (M_PIf * powf(cosTheta * cosTheta * (alphaSqr - 1.0f) + 1.0f, 2.0f));
 
-	bool sameHemisphere = cosTheta * dot(woWorld, N) > 0 ? true : false;
+	bool sameHemisphere = cosTheta * dot(woWorld, H) > 0 ? true : false;
 	prd.pdf = sameHemisphere ? pdf : 0.0f;			// Importance Sampling
 }
 
@@ -42,9 +42,9 @@ RT_CALLABLE_PROGRAM void Sample(MaterialParameter &mat, State &state, PerRayData
 
 	float3 half = make_float3(sinTheta*cosPhi, sinTheta*sinPhi, cosTheta);
 	onb.inverse_transform(half);
+	//AlignVector(N, half);
 	float3 dir = 2.0f*dot(woWorld, half)*half - woWorld; //reflection vector
 
-	//AlignVector(N, dir);
 	prd.wi = dir;
 }
 
@@ -59,7 +59,8 @@ RT_CALLABLE_PROGRAM float3 Eval(MaterialParameter &mat, State &state, PerRayData
 	float alpha = powf(max(0.001f, mat.roughness), 2.0f);
 	float alphaSqr = alpha * alpha;
 
-	float3 F0 = make_float3(0.04f);
+	float3 dielectricSpecular = make_float3(0.04f, 0.04f, 0.04f);
+	float3 F0 = lerp(dielectricSpecular, mat.albedo, mat.metallic);
 	float3 F = F0 + (1.0f - F0) * powf(1.0f - dot(woWorld, H), 5.0f);
 
 	float NDotL = dot(N, wiWorld);

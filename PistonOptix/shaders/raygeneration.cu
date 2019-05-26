@@ -26,6 +26,39 @@ rtDeclareVariable(uint2, theLaunchIndex, rtLaunchIndex, );
 
 using namespace optix;
 
+#if !USE_SHADER_TONEMAP
+rtDeclareVariable(float, invWhitePoint, , );
+rtDeclareVariable(float3, colorBalance, , );
+rtDeclareVariable(float, burnHighlights, , );
+rtDeclareVariable(float, saturation, , );
+rtDeclareVariable(float, crushBlacks, , );
+rtDeclareVariable(float, invGamma, , );
+rtDeclareVariable(int, useToneMapper, , );
+
+
+RT_FUNCTION float3 ToneMap(optix::float3& hdrColor)
+{
+	if(useToneMapper == 0)
+	{
+		return hdrColor;
+	}
+
+	float3 ldrColor = invWhitePoint * colorBalance * hdrColor;
+	ldrColor *= (ldrColor * burnHighlights + 1.0) / (ldrColor + 1.0);
+	float luminance = dot(ldrColor, make_float3(0.3, 0.59, 0.11));
+	ldrColor = fmaxf(lerp(make_float3(luminance), ldrColor, saturation), 0.0f);
+	luminance = dot(ldrColor, make_float3(0.3, 0.59, 0.11));
+	if (luminance < 1.0)
+	{
+	  ldrColor = fmaxf(lerp(fpowf(ldrColor, make_float3(crushBlacks)), ldrColor, sqrt(luminance)), 0.0f);
+	}
+
+	ldrColor = fpowf(ldrColor, make_float3(invGamma));
+	return ldrColor;
+}
+#endif
+
+
 RT_FUNCTION void integrator(PerRayData& prd, float3& radiance)
 {
 	radiance = make_float3(0.0f);				// Start with black.
@@ -86,6 +119,10 @@ RT_PROGRAM void raygeneration()
 	float3 radiance;
 
 	integrator(prd, radiance); // In this case a unidirectional path tracer.
+
+#if !USE_SHADER_TONEMAP
+	radiance = ToneMap(radiance);
+#endif
 
 #if USE_DEBUG_EXCEPTIONS
   // DAR DEBUG Highlight numerical errors.

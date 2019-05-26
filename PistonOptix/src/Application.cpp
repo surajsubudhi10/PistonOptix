@@ -1,6 +1,6 @@
-#include "shaders/app_config.h"
-
 #include "inc/Application.h"
+#include "shaders/app_config.h"
+#include "shaders/material_parameter.h"
 
 #include <optix.h>
 #include <optixu/optixpp_namespace.h>
@@ -8,20 +8,18 @@
 #include <optixu/optixu_matrix_namespace.h>
 
 #define TINYOBJLOADER_IMPLEMENTATION
-//#include <tinyobjloader\tiny_obj_loader.h>
 #include <tiny_obj_loader.h>
 
-#include <algorithm>
 #include <cstring>
 #include <iostream>
 #include <sstream>
 
-#include "shaders/material_parameter.h"
 
 // DAR Only for sutil::samplesPTXDir() and sutil::writeBufferToFile()
 #include <sutil.h>
-
 #include "inc/MyAssert.h"
+
+#define STATIC_CAST(type, val) static_cast<type>(val)
 
 const char* const SAMPLE_NAME = "PistonOptix";
 
@@ -241,7 +239,6 @@ void Application::guiRender()
 	ImGui_ImplGlfwGL2_RenderDrawData(ImGui::GetDrawData());
 }
 
-
 void Application::getSystemInformation()
 {
 	unsigned int optixVersion;
@@ -330,7 +327,7 @@ void Application::initOpenGL()
 		MY_ASSERT(m_pboOutputBuffer != 0);
 		// Buffer size must be > 0 or OptiX can't create a buffer from it.
 		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, m_pboOutputBuffer);
-		glBufferData(GL_PIXEL_UNPACK_BUFFER, m_width * m_height * sizeof(float) * 4, (void*)0, GL_STREAM_READ); // RGBA32F from byte offset 0 in the pixel unpack buffer.
+		glBufferData(GL_PIXEL_UNPACK_BUFFER, m_width * m_height * sizeof(float) * 4, nullptr, GL_STREAM_READ); // RGBA32F from byte offset 0 in the pixel unpack buffer.
 		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 	}
 
@@ -383,9 +380,9 @@ void Application::initOptiX()
 
 		// Print out the current configuration to make sure what's currently running.
 		devices = m_context->getEnabledDevices();
-		for (size_t i = 0; i < devices.size(); ++i)
+		for (auto device : devices)
 		{
-			std::cout << "m_context is using local device " << devices[i] << ": " << m_context->getDeviceName(devices[i]) << std::endl;
+			std::cout << "m_context is using local device " << device << ": " << m_context->getDeviceName(device) << std::endl;
 		}
 		std::cout << "OpenGL interop is " << ((m_interop) ? "enabled" : "disabled") << std::endl;
 
@@ -449,6 +446,16 @@ void Application::initRenderer()
 		m_context["sysCameraU"]->setFloat(1.0f, 0.0f, 0.0f);
 		m_context["sysCameraV"]->setFloat(0.0f, 1.0f, 0.0f);
 		m_context["sysCameraW"]->setFloat(0.0f, 0.0f, -1.0f);
+
+#if !USE_SHADER_TONEMAP
+		m_context["useToneMapper"]->setInt(m_useTonermapper);
+		m_context["colorBalance"]->setFloat(m_colorBalance);
+		m_context["invGamma"]->setFloat(1.0f / m_gamma);
+		m_context["invWhitePoint"]->setFloat(m_brightness / m_whitePoint);
+		m_context["crushBlacks"]->setFloat(m_crushBlacks + m_crushBlacks + 1.0f);
+		m_context["saturation"]->setFloat(m_saturation);
+		m_context["burnHighlights"]->setFloat(m_burnHighlights);
+#endif
 	}
 	catch (optix::Exception& e)
 	{
@@ -510,7 +517,7 @@ bool Application::render()
 		optix::float3 cameraV;
 		optix::float3 cameraW;
 
-		bool cameraChanged = m_pinholeCamera.getFrustum(cameraPosition, cameraU, cameraV, cameraW);
+		const bool cameraChanged = m_pinholeCamera.getFrustum(cameraPosition, cameraU, cameraV, cameraW);
 		if (cameraChanged)
 		{
 			m_context["sysCameraPosition"]->setFloat(cameraPosition);
@@ -538,22 +545,21 @@ bool Application::render()
 			if (m_interop)
 			{
 				glBindBuffer(GL_PIXEL_UNPACK_BUFFER, m_bufferOutput->getGLBOId());
-				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, (GLsizei)m_width, (GLsizei)m_height, 0, GL_RGBA, GL_FLOAT, (void*)0); // RGBA32F from byte offset 0 in the pixel unpack buffer.
+				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, STATIC_CAST(GLsizei, m_width), STATIC_CAST(GLsizei, m_height), 0, GL_RGBA, GL_FLOAT, nullptr); // RGBA32F from byte offset 0 in the pixel unpack buffer.
 				glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 			}
 			else
 			{
 				const void* data = m_bufferOutput->map(0, RT_BUFFER_MAP_READ);
-				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, (GLsizei)m_width, (GLsizei)m_height, 0, GL_RGBA, GL_FLOAT, data); // RGBA32F
+				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, STATIC_CAST(GLsizei, m_width), STATIC_CAST(GLsizei, m_height), 0, GL_RGBA, GL_FLOAT, data); // RGBA32F
 				m_bufferOutput->unmap();
 			}
 
 			repaint = true; // Indicate that there is a new image.
-
 			m_presentNext = m_present;
 		}
 
-		double seconds = m_timer.getTime();
+		const double seconds = m_timer.getTime();
 #if 1
 		// Show the accumulation of the first half second to remain interactive with "present 0" on the VCA.
 		// Not done when benchmarking to get more accurate results.
@@ -567,12 +573,10 @@ bool Application::render()
 		if (m_presentAtSecond < seconds)
 		{
 			m_presentAtSecond = ceil(seconds);
-
 			const double fps = double(m_iterationIndex) / seconds;
-
 			std::ostringstream stream;
 			stream.precision(3); // Precision is # digits in fraction part.
-			// m_iterationIndex has already been incremented for the last rendered frame, so it is the actual framecount here.
+			// m_iterationIndex has already been incremented for the last rendered frame, so it is the actual frame count here.
 			stream << std::fixed << m_iterationIndex << " / " << seconds << " = " << fps << " fps";
 			std::cout << stream.str() << std::endl;
 
@@ -586,7 +590,7 @@ bool Application::render()
 	return repaint;
 }
 
-void Application::display()
+void Application::display() const
 {
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, m_hdrTexture);
@@ -594,14 +598,14 @@ void Application::display()
 	glUseProgram(m_glslProgram);
 
 	glBegin(GL_QUADS);
-	glTexCoord2f(0.0f, 0.0f);
-	glVertex2f(-1.0f, -1.0f);
-	glTexCoord2f(1.0f, 0.0f);
-	glVertex2f(1.0f, -1.0f);
-	glTexCoord2f(1.0f, 1.0f);
-	glVertex2f(1.0f, 1.0f);
-	glTexCoord2f(0.0f, 1.0f);
-	glVertex2f(-1.0f, 1.0f);
+		glTexCoord2f(0.0f, 0.0f);
+		glVertex2f(-1.0f, -1.0f);
+		glTexCoord2f(1.0f, 0.0f);
+		glVertex2f(1.0f, -1.0f);
+		glTexCoord2f(1.0f, 1.0f);
+		glVertex2f(1.0f, 1.0f);
+		glTexCoord2f(0.0f, 1.0f);
+		glVertex2f(-1.0f, 1.0f);
 	glEnd();
 
 	glUseProgram(0);
@@ -610,7 +614,7 @@ void Application::display()
 void Application::screenshot(std::string const& filename)
 {
 	sutil::writeBufferToFile(filename.c_str(), m_bufferOutput);
-	std::cerr << "Wrote " << filename << std::endl;
+	std::cout << "Wrote " << filename << std::endl;
 }
 
 // Helper functions:
@@ -618,7 +622,6 @@ void Application::checkInfoLog(const char *msg, GLuint object)
 {
 	GLint maxLength;
 	GLint length;
-	GLchar *infoLog;
 
 	if (glIsProgram(object))
 	{
@@ -630,7 +633,7 @@ void Application::checkInfoLog(const char *msg, GLuint object)
 	}
 	if (maxLength > 1)
 	{
-		infoLog = (GLchar *)malloc(maxLength);
+		GLchar* infoLog = STATIC_CAST(GLchar*, malloc(maxLength));
 		if (infoLog != nullptr)
 		{
 			if (glIsShader(object))
@@ -641,17 +644,11 @@ void Application::checkInfoLog(const char *msg, GLuint object)
 			{
 				glGetProgramInfoLog(object, maxLength, &length, infoLog);
 			}
-			//fprintf(fileLog, "-- tried to compile (len=%d): %s\n", (unsigned int)strlen(msg), msg);
-			//fprintf(fileLog, "--- info log contents (len=%d) ---\n", (int) maxLength);
-			//fprintf(fileLog, "%s", infoLog);
-			//fprintf(fileLog, "--- end ---\n");
 			std::cout << infoLog << std::endl;
-			// Look at the info log string here...
 			free(infoLog);
 		}
 	}
 }
-
 
 void Application::initGLSL()
 {
@@ -665,7 +662,18 @@ void Application::initGLSL()
 		"  gl_Position  = attrPosition;\n"
 		"  varTexCoord0 = attrTexCoord0;\n"
 		"}\n";
-
+#if !USE_SHADER_TONEMAP
+	static const std::string fsSource =
+		"#version 330\n"
+		"uniform sampler2D samplerHDR;\n"
+		"in vec2 varTexCoord0;\n"
+		"layout(location = 0, index = 0) out vec4 outColor;\n"
+		"void main()\n"
+		"{\n"
+		"  vec3 hdrColor = texture(samplerHDR, varTexCoord0).rgb;\n"
+		"  outColor = vec4(hdrColor, 1.0);\n"
+		"}\n";
+#else
 	static const std::string fsSource =
 		"#version 330\n"
 		"uniform sampler2D samplerHDR;\n"
@@ -675,6 +683,7 @@ void Application::initGLSL()
 		"uniform float saturation;\n"
 		"uniform float crushBlacks;\n"
 		"uniform float invGamma;\n"
+		"uniform int useToneMapper;\n"
 		"in vec2 varTexCoord0;\n"
 		"layout(location = 0, index = 0) out vec4 outColor;\n"
 		"void main()\n"
@@ -691,8 +700,9 @@ void Application::initGLSL()
 		"  }\n"
 		"  ldrColor = pow(ldrColor, vec3(invGamma));\n"
 		"  outColor = vec4(ldrColor, 1.0);\n"
+		"  if(useToneMapper == 0){outColor = vec4(hdrColor, 1.0);}\n"
 		"}\n";
-
+#endif
 	GLint vsCompiled = 0;
 	GLint fsCompiled = 0;
 
@@ -753,12 +763,12 @@ void Application::initGLSL()
 			glUniform1f(glGetUniformLocation(m_glslProgram, "burnHighlights"), m_burnHighlights);
 			glUniform1f(glGetUniformLocation(m_glslProgram, "crushBlacks"), m_crushBlacks + m_crushBlacks + 1.0f);
 			glUniform1f(glGetUniformLocation(m_glslProgram, "saturation"), m_saturation);
+			glUniform1i(glGetUniformLocation(m_glslProgram, "useToneMapper"), STATIC_CAST(int, m_useTonermapper));
 
 			glUseProgram(0);
 		}
 	}
 }
-
 
 void Application::guiWindow()
 {
@@ -812,8 +822,15 @@ void Application::guiWindow()
 			m_pinholeCamera.setSpeedRatio(m_mouseSpeedRatio);
 		}
 	}
+#if USE_SHADER_TONEMAP
 	if (ImGui::CollapsingHeader("Tonemapper"))
 	{
+		if (ImGui::Checkbox("Use ToneMapper", &m_useTonermapper))
+		{
+			glUseProgram(m_glslProgram);
+			glUniform1i(glGetUniformLocation(m_glslProgram, "useToneMapper"), STATIC_CAST(int, m_useTonermapper));
+			glUseProgram(0);
+		}
 		if (ImGui::ColorEdit3("Balance", (float*)&m_colorBalance))
 		{
 			glUseProgram(m_glslProgram);
@@ -857,6 +874,51 @@ void Application::guiWindow()
 			glUseProgram(0);
 		}
 	}
+#else
+	if (ImGui::CollapsingHeader("Tonemapper"))
+	{
+		if (ImGui::Checkbox("Use ToneMapper", &m_useTonermapper))
+		{
+			m_context["useToneMapper"]->setInt(m_useTonermapper);
+			restartAccumulation();
+		}
+		if (ImGui::ColorEdit3("Balance", (float*)&m_colorBalance))
+		{
+			m_context["colorBalance"]->setFloat(m_colorBalance);
+			restartAccumulation();
+		}
+		if (ImGui::DragFloat("Gamma", &m_gamma, 0.01f, 0.01f, 10.0f)) // Must not get 0.0f
+		{
+			m_context["invGamma"]->setFloat(1.0f / m_gamma);
+			restartAccumulation();
+		}
+		if (ImGui::DragFloat("White Point", &m_whitePoint, 0.01f, 0.01f, 255.0f, "%.2f", 2.0f)) // Must not get 0.0f
+		{
+			m_context["invWhitePoint"]->setFloat(m_brightness / m_whitePoint);
+			restartAccumulation();
+		}
+		if (ImGui::DragFloat("Burn Lights", &m_burnHighlights, 0.01f, 0.0f, 10.0f, "%.2f"))
+		{
+			m_context["burnHighlights"]->setFloat(m_burnHighlights);
+			restartAccumulation();
+		}
+		if (ImGui::DragFloat("Crush Blacks", &m_crushBlacks, 0.01f, 0.0f, 1.0f, "%.2f"))
+		{
+			m_context["crushBlacks"]->setFloat(m_crushBlacks + m_crushBlacks + 1.0f);
+			restartAccumulation();
+		}
+		if (ImGui::DragFloat("Saturation", &m_saturation, 0.01f, 0.0f, 10.0f, "%.2f"))
+		{
+			m_context["saturation"]->setFloat(m_saturation);
+			restartAccumulation();
+		}
+		if (ImGui::DragFloat("Brightness", &m_brightness, 0.01f, 0.0f, 100.0f, "%.2f", 2.0f))
+		{
+			m_context["invWhitePoint"]->setFloat(m_brightness / m_whitePoint);
+			restartAccumulation();
+		}
+	}
+#endif
 	if (ImGui::CollapsingHeader("Materials"))
 	{
 		bool changed = false;
@@ -868,11 +930,6 @@ void Application::guiWindow()
 				MaterialParameterGUI& parameters = m_guiMaterialParameters[i];
 
 				if (ImGui::ColorEdit3("Albedo", (float*)&parameters.albedo))
-				{
-					changed = true;
-				}
-
-				if (ImGui::ColorEdit3("Specular", (float*)&parameters.specular))
 				{
 					changed = true;
 				}
@@ -907,9 +964,29 @@ void Application::guiEventHandler()
 {
 	ImGuiIO const& io = ImGui::GetIO();
 
-	if (ImGui::IsKeyPressed(' ', false)) // Toggle the GUI window display with SPACE key.
+	if (ImGui::IsKeyPressed(GLFW_KEY_SPACE, false)) // Toggle the GUI window display with SPACE key.
 	{
 		m_isWindowVisible = !m_isWindowVisible;
+	}
+
+	if (ImGui::IsKeyPressed(GLFW_KEY_S, false)) // Toggle the GUI window display with SPACE key.
+	{
+		screenshot("PistonOptix.png");
+	}
+
+	if (ImGui::IsKeyPressed(GLFW_KEY_C, false)) // Toggle the GUI window display with SPACE key.
+	{
+		m_pinholeCamera.getCameraVariables();
+	}
+
+	if (ImGui::IsKeyPressed(GLFW_KEY_L, false)) // Toggle the GUI window display with SPACE key.
+	{
+		m_pinholeCamera.setCameraVariables(make_float3(0.0f), 0.83f, 0.77f, 38.0f);
+	}
+
+	if (ImGui::IsKeyPressed(GLFW_KEY_ESCAPE, false)) // Toggle the GUI window display with SPACE key.
+	{
+		glfwSetWindowShouldClose(m_window, 1);
 	}
 
 	const ImVec2 mousePosition = ImGui::GetMousePos(); // Mouse coordinate window client rect.
@@ -975,6 +1052,7 @@ void Application::guiEventHandler()
 			m_pinholeCamera.pan(x, y);
 		}
 		break;
+	default: ;
 	}
 }
 
@@ -1119,9 +1197,6 @@ void Application::initPrograms()
 		m_bufferBRDFPdf->unmap();
 		m_context["sysBRDFPdf"]->setBuffer(m_bufferBRDFPdf);
 
-
-
-
 	}
 	catch (optix::Exception& e)
 	{
@@ -1131,8 +1206,6 @@ void Application::initPrograms()
 
 void Application::updateMaterialParameters()
 {
-	MY_ASSERT((sizeof(MaterialParameter) & 15) == 0); // Verify float4 alignment.
-
 	// Convert the GUI material parameters to the device side structure and upload them into the context global buffer.
 	// (Doing this in a loop will make more sense in later examples.)
 	MaterialParameter* dst = static_cast<MaterialParameter*>(m_bufferMaterialParameters->map(0, RT_BUFFER_MAP_WRITE_DISCARD));
@@ -1142,7 +1215,6 @@ void Application::updateMaterialParameters()
 		MaterialParameterGUI& src = m_guiMaterialParameters[i];
 
 		dst->albedo = src.albedo;
-		dst->specular = src.specular;
 		dst->metallic = src.metallic;
 		dst->roughness = src.roughness;
 	}
@@ -1156,26 +1228,22 @@ void Application::initMaterials()
 	MaterialParameterGUI parameters;
 
 	// Make all parameters white to show automatic ambient occlusion with a brute force full global illumination path tracer.
-	parameters.albedo = optix::make_float3(1.0f);
-	parameters.specular = optix::make_float3(1.0f);
-	parameters.roughness = 0.1f;
+	parameters.albedo = optix::make_float3(0.6f);
+	parameters.roughness = 1.0f;
 	parameters.metallic = 0.0f;
 	m_guiMaterialParameters.push_back(parameters); // 0, floor
 
 	parameters.albedo = optix::make_float3(0.0f);
-	parameters.specular = optix::make_float3(1.0f, 0.0f, 0.3f);
 	parameters.roughness = 0.5f;
 	parameters.metallic = 0.0f;
 	m_guiMaterialParameters.push_back(parameters); // 1, box
 
-	parameters.albedo = optix::make_float3(1.0f);
-	parameters.specular = optix::make_float3(0.04f);
-	parameters.roughness = 0.0f;
-	parameters.metallic = 0.0f;
+	parameters.albedo = optix::make_float3(1.0f, 0.0f, 0.0f);
+	parameters.roughness = 0.5f;
+	parameters.metallic = 1.0f;
 	m_guiMaterialParameters.push_back(parameters); // 2, sphere
 
 	parameters.albedo = optix::make_float3(1.0f);
-	parameters.specular = optix::make_float3(1.0f);
 	parameters.roughness = 1.0f;
 	parameters.metallic = 0.0f;
 	m_guiMaterialParameters.push_back(parameters); // 3, torus
@@ -1271,8 +1339,11 @@ void Application::createScene()
 		  0.0f, 0.0f, 0.0f, 1.0f
 		};
 
-		std::string objMatFilepath = std::string(sutil::samplesDir()) + "\\resources\\Models\\OBJFiles\\ShaderBall\\BallMainCentMatL1.obj";
-		std::string objStandFilepath = std::string(sutil::samplesDir()) + "\\resources\\Models\\OBJFiles\\ShaderBall\\BallStandCentMatL1.obj";
+		const std::string objMatFilepath = std::string(sutil::samplesDir()) + 
+			R"(\resources\Models\OBJFiles\ShaderBall\BallMainCentMatL1.obj)";
+		const std::string objStandFilepath = std::string(sutil::samplesDir()) + 
+			R"(\resources\Models\OBJFiles\ShaderBall\BallStandCentMatL1.obj)";
+
 		createGeometryFromOBJ(objMatFilepath, 2, trafoOBJ);
 		createGeometryFromOBJ(objStandFilepath, 1, trafoOBJ);
 
@@ -1306,19 +1377,19 @@ optix::Geometry Application::LoadOBJ(std::string inputfile)
 
 	// Loop over shapes
 	size_t numOfIndicesInShape = 0;
-	for (size_t s = 0; s < shapes.size(); s++) 
+	for (auto& shape : shapes)
 	{
 		// Loop over faces(polygon)
 		size_t index_offset = 0;
-		for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++)
+		for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++)
 		{
-			int fv = shapes[s].mesh.num_face_vertices[f];
+			int fv = shape.mesh.num_face_vertices[f];
 
 			// Loop over vertices in the face.
 			for (size_t v = 0; v < fv; v++) 
 			{
 				// access to vertex
-				tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
+				tinyobj::index_t idx = shape.mesh.indices[index_offset + v];
 				VertexAttributes singleVertexData;
 
 				tinyobj::real_t vx = attrib.vertices[3 * idx.vertex_index + 0];
@@ -1351,7 +1422,7 @@ optix::Geometry Application::LoadOBJ(std::string inputfile)
 			index_offset += fv;
 
 			// per-face material
-			shapes[s].mesh.material_ids[f];
+			shape.mesh.material_ids[f];
 		}
 		numOfIndicesInShape += index_offset;
 	}

@@ -59,8 +59,8 @@ void printUsage(const std::string& argv0)
 
 int main(int argc, char *argv[])
 {
-	int  windowWidth = 512;
-	int  windowHeight = 512;
+	int  windowWidth = 1280;
+	int  windowHeight = 720;
 	int  devices = 3210;  // Decimal digits encode OptiX device ordinals. Default 3210 means to use all four first installed devices, when available.
 	bool interop = true;  // Use OpenGL interop Pixel-Bufferobject to display the resulting image. Disable this when running on multi-GPU or TCC driver mode.
 	int  stackSize = 1024;  // Command line parameter just to be able to find the smallest working size.
@@ -205,7 +205,7 @@ int main(int argc, char *argv[])
 		}
 		else
 		{
-			for (int i = 0; i < 64; ++i) // Accumulate 64 samples per pixel.
+			for (int i = 0; i < 100; ++i) // Accumulate 64 samples per pixel.
 			{
 				g_app->render();  // OptiX rendering and OpenGL texture update.
 			}

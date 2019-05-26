@@ -463,7 +463,8 @@ void sutil::writeBufferToFile( const char* filename, RTbuffer buffer)
     RTformat buffer_format;
     RT_CHECK_ERROR( rtBufferGetFormat(buffer, &buffer_format) );
 
-    switch(buffer_format) {
+    switch(buffer_format) 
+	{
         case RT_FORMAT_UNSIGNED_BYTE4:
             // Data is BGRA and upside down, so we need to swizzle to RGB
             for(int j = height-1; j >= 0; --j) {

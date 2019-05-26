@@ -45,5 +45,5 @@ RT_CALLABLE_PROGRAM float3 Eval(MaterialParameter &mat, State &state, PerRayData
 	float alpha = mat.roughness;
 
 	// https://seblagarde.wordpress.com/2011/08/17/hello-world/
-	return mat.specular * M_2_PIf * (alpha + 2.0f) * satu(powf(cosTheta, alpha));
+	return mat.albedo * M_2_PIf * (alpha + 2.0f) * satu(powf(cosTheta, alpha));
 }
