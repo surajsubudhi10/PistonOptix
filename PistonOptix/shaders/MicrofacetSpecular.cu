@@ -6,6 +6,14 @@
 
 rtDeclareVariable(Ray, theRay, rtCurrentRay, );
 
+
+RT_FUNCTION float smithG_GGX(float NDotv, float alphaG)
+{
+	float a = alphaG * alphaG;
+	float b = NDotv * NDotv;
+	return 1.0f / (NDotv + sqrtf(a + b - a * b));
+}
+
 RT_CALLABLE_PROGRAM void PDF(MaterialParameter &mat, State &state, PerRayData &prd)
 {
 	float3 N = state.shading_normal;					// In World Coordinate
@@ -67,7 +75,11 @@ RT_CALLABLE_PROGRAM float3 Eval(MaterialParameter &mat, State &state, PerRayData
 	float NDotV = dot(N, woWorld);
 
 	float vis = 0.5f / (NDotL * sqrt(NDotV * NDotV * (1.0f - alphaSqr) + alphaSqr) + NDotV * sqrt(NDotL * NDotL * (1.0f - alphaSqr) + alphaSqr));
+	
 	float D =  alphaSqr / (M_PIf * powf(cosTheta * cosTheta * (alphaSqr - 1.0f) + 1.0f, 2.0f));
+	float roughg = powf(mat.roughness*0.5f + 0.5f, 2.0f);
+	float G = smithG_GGX(NDotL, roughg) * smithG_GGX(NDotV, roughg);
+	
 
-	return F * vis * D;
+	return F * G * D;
 }
