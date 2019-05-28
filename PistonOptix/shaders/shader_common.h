@@ -209,6 +209,11 @@ RT_FUNCTION bool isNotNull(const optix::float3& v)
 	return (v.x != 0.0f || v.y != 0.0f || v.z != 0.0f);
 }
 
+RT_FUNCTION float charFunc(float val) 
+{
+	return val > 0 ? 1.0f : 0.0f;
+}
+
 // Used for Multiple Importance Sampling.
 RT_FUNCTION float powerHeuristic(const float a, const float b)
 {
@@ -269,6 +274,35 @@ RT_FUNCTION float3 CosineWeightedHemisphereSampling(float2 sample, float alpha)
 	float sinPhi = sinf(phi);
 
 	return make_float3(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
+}
+
+RT_FUNCTION // BxDF Utility Functions
+float FrDielectric(float cosThetaI, float etaI, float etaT)
+{
+	cosThetaI = clamp(cosThetaI, -1.0f, 1.0f);
+	// Potentially swap indices of refraction
+	bool entering = cosThetaI > 0.f;
+	if (!entering)
+	{
+		auto temp = etaT;
+		etaT = etaI;
+		etaI = temp;
+
+		cosThetaI = abs(cosThetaI);
+	}
+
+	// Compute _cosThetaT_ using Snell's law
+	float sinThetaI = sqrt(max((float)0, 1 - cosThetaI * cosThetaI));
+	float sinThetaT = etaI / etaT * sinThetaI;
+
+	// Handle total internal reflection
+	if (sinThetaT >= 1) return 1;
+	float cosThetaT = sqrt(max((float)0, 1 - sinThetaT * sinThetaT));
+	float Rparl = ((etaT * cosThetaI) - (etaI * cosThetaT)) /
+		((etaT * cosThetaI) + (etaI * cosThetaT));
+	float Rperp = ((etaI * cosThetaI) - (etaT * cosThetaT)) /
+		((etaI * cosThetaI) + (etaT * cosThetaT));
+	return (Rparl * Rparl + Rperp * Rperp) / 2;
 }
 
 #endif // SHADER_COMMON_H

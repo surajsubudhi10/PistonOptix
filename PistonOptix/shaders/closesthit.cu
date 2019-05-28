@@ -102,9 +102,9 @@ RT_PROGRAM void closesthit()
 	else
 	{
 		// Specular reflection
-		sysBRDFSample[EBrdfTypes::MICROFACET](mat, state, thePrd);
-		sysBRDFPdf[EBrdfTypes::MICROFACET](mat, state, thePrd);
-		specularBRDF = sysBRDFEval[EBrdfTypes::MICROFACET](mat, state, thePrd);
+		sysBRDFSample[EBrdfTypes::MICROFACET_REFLECTION](mat, state, thePrd);
+		sysBRDFPdf[EBrdfTypes::MICROFACET_REFLECTION](mat, state, thePrd);
+		specularBRDF = sysBRDFEval[EBrdfTypes::MICROFACET_REFLECTION](mat, state, thePrd);
 	}
 
 	float3 wiWorld = thePrd.wi;
@@ -113,7 +113,7 @@ RT_PROGRAM void closesthit()
 	float3 H = normalize(woWorld + wiWorld);
 
 
-	float3 F = F0 + (1.0f - F0) * powf(1.0f - dot(woWorld, H), 5.0f);
+	float3 F = F0 + (1.0f - F0) * powf(1.0f - dot(wiWorld, H), 5.0f);
 	float3 f = (1.0f - F) * diffuseBRDF + specularBRDF;
 	
 

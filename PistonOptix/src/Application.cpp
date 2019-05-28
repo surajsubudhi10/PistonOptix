@@ -411,7 +411,7 @@ void Application::initRenderer()
 #if USE_DEBUG_EXCEPTIONS
 		// Disable this by default for performance, otherwise the stitched PTX code will have lots of exception handling inside. 
 		m_context->setPrintEnabled(true);
-		//m_context->setPrintLaunchIndex(256, 256);
+		m_context->setPrintLaunchIndex(0, 0);
 		m_context->setExceptionEnabled(RT_EXCEPTION_ALL, true);
 #endif 
 
@@ -1168,8 +1168,8 @@ void Application::initPrograms()
 		brdfSample[EBrdfTypes::LAMBERT] = prg->getId();
 		prg = m_context->createProgramFromPTXFile(ptxPath("PhongModified.cu"), "Sample");
 		brdfSample[EBrdfTypes::PHONG] = prg->getId();
-		prg = m_context->createProgramFromPTXFile(ptxPath("MicrofacetSpecular.cu"), "Sample");
-		brdfSample[EBrdfTypes::MICROFACET] = prg->getId();
+		prg = m_context->createProgramFromPTXFile(ptxPath("MicrofacetReflection.cu"), "Sample");
+		brdfSample[EBrdfTypes::MICROFACET_REFLECTION] = prg->getId();
 		m_bufferBRDFSample->unmap();
 		m_context["sysBRDFSample"]->setBuffer(m_bufferBRDFSample);
 
@@ -1180,8 +1180,8 @@ void Application::initPrograms()
 		brdfEval[EBrdfTypes::LAMBERT] = prg->getId();
 		prg = m_context->createProgramFromPTXFile(ptxPath("PhongModified.cu"), "Eval");
 		brdfEval[EBrdfTypes::PHONG] = prg->getId();
-		prg = m_context->createProgramFromPTXFile(ptxPath("MicrofacetSpecular.cu"), "Eval");
-		brdfEval[EBrdfTypes::MICROFACET] = prg->getId();
+		prg = m_context->createProgramFromPTXFile(ptxPath("MicrofacetReflection.cu"), "Eval");
+		brdfEval[EBrdfTypes::MICROFACET_REFLECTION] = prg->getId();
 		m_bufferBRDFEval->unmap();
 		m_context["sysBRDFEval"]->setBuffer(m_bufferBRDFEval);
 
@@ -1192,8 +1192,8 @@ void Application::initPrograms()
 		brdfPDF[EBrdfTypes::LAMBERT] = prg->getId();
 		prg = m_context->createProgramFromPTXFile(ptxPath("PhongModified.cu"), "PDF");
 		brdfPDF[EBrdfTypes::PHONG] = prg->getId();
-		prg = m_context->createProgramFromPTXFile(ptxPath("MicrofacetSpecular.cu"), "PDF");
-		brdfPDF[EBrdfTypes::MICROFACET] = prg->getId();
+		prg = m_context->createProgramFromPTXFile(ptxPath("MicrofacetReflection.cu"), "PDF");
+		brdfPDF[EBrdfTypes::MICROFACET_REFLECTION] = prg->getId();
 		m_bufferBRDFPdf->unmap();
 		m_context["sysBRDFPdf"]->setBuffer(m_bufferBRDFPdf);
 

@@ -69,7 +69,7 @@ RT_CALLABLE_PROGRAM float3 Eval(MaterialParameter &mat, State &state, PerRayData
 
 	float3 dielectricSpecular = make_float3(0.04f, 0.04f, 0.04f);
 	float3 F0 = lerp(dielectricSpecular, mat.albedo, mat.metallic);
-	float3 F = F0 + (1.0f - F0) * powf(1.0f - dot(woWorld, H), 5.0f);
+	float3 F = F0 + (1.0f - F0) * powf(1.0f - dot(wiWorld, H), 5.0f);
 
 	float NDotL = dot(N, wiWorld);
 	float NDotV = dot(N, woWorld);
@@ -77,9 +77,10 @@ RT_CALLABLE_PROGRAM float3 Eval(MaterialParameter &mat, State &state, PerRayData
 	float vis = 0.5f / (NDotL * sqrt(NDotV * NDotV * (1.0f - alphaSqr) + alphaSqr) + NDotV * sqrt(NDotL * NDotL * (1.0f - alphaSqr) + alphaSqr));
 	
 	float D =  alphaSqr / (M_PIf * powf(cosTheta * cosTheta * (alphaSqr - 1.0f) + 1.0f, 2.0f));
+
+	// https://blog.selfshadow.com/publications/s2012-shading-course/burley/s2012_pbs_disney_brdf_notes_v3.pdf (Section 5.6)
 	float roughg = powf(mat.roughness*0.5f + 0.5f, 2.0f);
 	float G = smithG_GGX(NDotL, roughg) * smithG_GGX(NDotV, roughg);
-	
 
 	return F * G * D;
 }

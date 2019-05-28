@@ -39,6 +39,7 @@ OPTIX_add_sample_executable( PistonOptix
   shaders/lambert.cu
   shaders/PhongModified.cu
   shaders/MicrofacetSpecular.cu
+  shaders/MicrofacetReflection.cu
 
   
 )    
