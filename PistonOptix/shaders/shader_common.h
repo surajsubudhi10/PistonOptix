@@ -11,6 +11,8 @@
 
 #include "rt_function.h"
 
+using namespace optix;
+
 // Explicitly not named Onb to not conflict with the optix::Onb
 // Tangent-Bitangent-Normal orthonormal space.
 struct TBN
@@ -242,9 +244,9 @@ RT_FUNCTION void AlignVector(float3 const& axis, float3& w)
 RT_FUNCTION float3 UniformHemisphereSampling(float2 point) 
 {
 	float cosTheta = point.x;
-	float sinTheta = sqrtf(max(0.0f, 1.0f - cosTheta * cosTheta));
+	float sinTheta = sqrtf(fmaxf(0.0f, 1.0f - cosTheta * cosTheta));
 
-	float phi = 2 * M_PI * point.y;
+	float phi = 2 * M_PIf * point.y;
 	float cosPhi = cosf(phi);
 	float sinPhi = sinf(phi);
 
@@ -267,42 +269,13 @@ RT_FUNCTION float3 UnitSquareToCosineHemisphere(const float2 sample)
 RT_FUNCTION float3 CosineWeightedHemisphereSampling(float2 sample, float alpha) 
 {
 	const float cosTheta = powf((1.0f - sample.y), 1.0f / (alpha + 1.0f));
-	const float sinTheta = sqrtf(max(0.0f, 1.0f - cosTheta * cosTheta));
+	const float sinTheta = sqrtf(fmaxf(0.0f, 1.0f - cosTheta * cosTheta));
 
-	float phi = 2 * M_PI * sample.y;
+	float phi = 2 * M_PIf * sample.y;
 	float cosPhi = cosf(phi);
 	float sinPhi = sinf(phi);
 
 	return make_float3(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
-}
-
-RT_FUNCTION // BxDF Utility Functions
-float FrDielectric(float cosThetaI, float etaI, float etaT)
-{
-	cosThetaI = clamp(cosThetaI, -1.0f, 1.0f);
-	// Potentially swap indices of refraction
-	bool entering = cosThetaI > 0.f;
-	if (!entering)
-	{
-		auto temp = etaT;
-		etaT = etaI;
-		etaI = temp;
-
-		cosThetaI = abs(cosThetaI);
-	}
-
-	// Compute _cosThetaT_ using Snell's law
-	float sinThetaI = sqrt(max((float)0, 1 - cosThetaI * cosThetaI));
-	float sinThetaT = etaI / etaT * sinThetaI;
-
-	// Handle total internal reflection
-	if (sinThetaT >= 1) return 1;
-	float cosThetaT = sqrt(max((float)0, 1 - sinThetaT * sinThetaT));
-	float Rparl = ((etaT * cosThetaI) - (etaI * cosThetaT)) /
-		((etaT * cosThetaI) + (etaI * cosThetaT));
-	float Rperp = ((etaI * cosThetaI) - (etaT * cosThetaT)) /
-		((etaI * cosThetaI) + (etaT * cosThetaT));
-	return (Rparl * Rparl + Rperp * Rperp) / 2;
 }
 
 #endif // SHADER_COMMON_H

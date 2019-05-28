@@ -8,6 +8,8 @@
 #include "material_parameter.h"
 #include "shader_common.h"
 #include "PistonOptix/inc/CudaUtils/State.h"
+#include "PistonOptix/inc/LightParameters.h"
+
 
 // Context global variables provided by the renderer system.
 rtDeclareVariable(rtObject, sysTopObject, , );
@@ -18,12 +20,13 @@ rtDeclareVariable(optix::Ray, theRay, rtCurrentRay, );
 rtDeclareVariable(float, theIntersectionDistance, rtIntersectionDistance, );
 
 rtDeclareVariable(PerRayData, thePrd, rtPayload, );
+rtDeclareVariable(ShadowPRD, prd_shadow, rtPayload, );
 
 // Attributes.
 rtDeclareVariable(optix::float3, varGeoNormal, attribute GEO_NORMAL, );
-//rtDeclareVariable(optix::float3, varTangent,   attribute TANGENT, );
+rtDeclareVariable(optix::float3, varTangent,   attribute TANGENT, );
 rtDeclareVariable(optix::float3, varNormal, attribute NORMAL, );
-//rtDeclareVariable(optix::float3, varTexCoord,  attribute TEXCOORD, ); 
+rtDeclareVariable(optix::float3, varTexCoord,  attribute TEXCOORD, ); 
 
 // Material parameter definition.
 rtBuffer<MaterialParameter> sysMaterialParameters; // Context global buffer with an array of structures of MaterialParameter.
@@ -34,6 +37,8 @@ rtBuffer< rtCallableProgramId<void(MaterialParameter &mat, State &state, PerRayD
 rtBuffer< rtCallableProgramId<void(MaterialParameter &mat, State &state, PerRayData &prd)> > sysBRDFSample;
 rtBuffer< rtCallableProgramId<float3(MaterialParameter &mat, State &state, PerRayData &prd)> > sysBRDFEval;
 
+rtBuffer< rtCallableProgramId<void(LightParameter &light, PerRayData &prd, LightSample &sample)> > sysLightSample;
+rtBuffer<LightParameter> sysLightParameters;
 
 RT_FUNCTION float sdot(float3 x, float3 y)
 {
@@ -63,7 +68,6 @@ RT_PROGRAM void closesthit()
 		// This gives the backfaces of opaque BSDFs a defined result.
 		geoNormal = -geoNormal;
 		shading_normal = -shading_normal;
-		// Do not recalculate the frontface condition!
 	}
 
 	State state;
@@ -81,9 +85,6 @@ RT_PROGRAM void closesthit()
 
 	float3 baseColor = mat.albedo;
 	float metallic = mat.metallic;
-
-	float3 dielectricSpecular = make_float3(0.04f, 0.04f, 0.04f);
-	float3 F0 = lerp(dielectricSpecular, baseColor, metallic);
 
 	float3 diffuseBRDF = make_float3(0.0f);
 	float3 specularBRDF = make_float3(0.0f);
@@ -109,11 +110,12 @@ RT_PROGRAM void closesthit()
 
 	float3 wiWorld = thePrd.wi;
 	float3 woWorld = -theRay.direction;
-	//float3 N = state.shading_normal;
 	float3 H = normalize(woWorld + wiWorld);
 
-
+	float3 dielectricSpecular = make_float3(0.04f, 0.04f, 0.04f);
+	float3 F0 = lerp(dielectricSpecular, baseColor, metallic);
 	float3 F = F0 + (1.0f - F0) * powf(1.0f - dot(wiWorld, H), 5.0f);
+
 	float3 f = (1.0f - F) * diffuseBRDF + specularBRDF;
 	
 
@@ -127,4 +129,36 @@ RT_PROGRAM void closesthit()
 
 	
 	thePrd.f_over_pdf = f * fabsf(optix::dot(thePrd.wi, state.shading_normal)) / thePrd.pdf;
+
+	// Add direct light sample weighted by shadow term and 1/probability.
+	// The pdf for a directional area light is 1/solid_angle.
+
+	const LightParameter& light = sysLightParameters[0];
+	const float3 light_center = state.hit_position + light.direction;
+	const float r1 = rng(thePrd.seed);
+	const float r2 = rng(thePrd.seed);
+	const float2 disk_sample = square_to_disk(make_float2(r1, r2));
+	const float3 jittered_pos = light_center + light.radius*disk_sample.x*light.u + light.radius*disk_sample.y*light.v;
+	const float3 L = normalize(jittered_pos - state.hit_position);
+
+	const float NdotL = dot(state.shading_normal, L);
+	if (NdotL > 0.0f) 
+	{
+		ShadowPRD shadow_prd;
+		shadow_prd.attenuation = make_float3(1.0f);
+
+		optix::Ray shadow_ray(state.hit_position, L, /*shadow ray type*/ 1, 0.0f);
+		rtTrace(sysTopObject, shadow_ray, shadow_prd);
+
+		const float solid_angle = light.radius*light.radius*M_PIf;
+		thePrd.radiance += NdotL * light.emission * 0.001f * solid_angle * shadow_prd.attenuation;
+	}
+}
+
+RT_PROGRAM void any_hit()
+{
+	prd_shadow.attenuation = make_float3(0.0f);
+	rtTerminateRay();
+	
+	thePrd.flags |= FLAG_TERMINATE;
 }

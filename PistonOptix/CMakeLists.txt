@@ -15,6 +15,8 @@ OPTIX_add_sample_executable( PistonOptix
   inc/Timer.h
   src/Timer.cpp
 
+  inc/LightParameters.h
+  
   inc/MyAssert.h
 
   inc/CudaUtils/State.h
@@ -37,10 +39,12 @@ OPTIX_add_sample_executable( PistonOptix
 
   shaders/closesthit.cu
   shaders/lambert.cu
+  shaders/OrenNayer.cu
   shaders/PhongModified.cu
   shaders/MicrofacetSpecular.cu
   shaders/MicrofacetReflection.cu
 
+  shaders/LightSample.cu
   
 )    
 

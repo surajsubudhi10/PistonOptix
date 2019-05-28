@@ -8,10 +8,8 @@
 #endif
 
 #include <imgui/imgui.h>
-
 #define IMGUI_DEFINE_MATH_OPERATORS 1
 #include <imgui/imgui_internal.h>
-
 #include <imgui/imgui_impl_glfw_gl2.h>
 
 #ifndef __APPLE__
@@ -31,6 +29,7 @@
 
 #include "shaders/vertex_attributes.h"
 #include "shaders/material_parameter.h"
+#include "inc\LightParameters.h"
 
 #include <string>
 #include <map>
@@ -104,7 +103,10 @@ private:
 	void initOptiX();
 	void initRenderer();
 	void initPrograms();
+	void initBRDFPrograms();
+	void initLightProgrames();
 	void initMaterials();
+	void initLights();
 	void initScene();
 
 	void createScene();
@@ -121,6 +123,7 @@ private:
 	void setAccelerationProperties(optix::Acceleration acceleration);
 
 	void updateMaterialParameters();
+	void updateLightParameters();
 
 	void restartAccumulation();
 
@@ -161,13 +164,20 @@ private:
 	optix::Buffer m_bufferBRDFEval;
 	optix::Buffer m_bufferBRDFPdf;
 
+	// Light Buffers
+	optix::Buffer					m_bufferLightSample;
+
 	std::map<std::string, optix::Program> m_mapOfPrograms;
 
 	// The material parameters exposed inside the GUI are slightly different than the resulting values for the device.
 	// The GUI exposes an absorption color and a distance scale, and the thin-walled property as bool.
 	// These are converted on the fly into the device side sysMaterialParameters buffer.
-	std::vector<MaterialParameterGUI> m_guiMaterialParameters;
-	optix::Buffer                     m_bufferMaterialParameters; // Array of MaterialParameters.
+	std::vector<MaterialParameterGUI>	m_guiMaterialParameters;
+
+	std::vector<LightParameter>			m_lightsList;
+	
+	optix::Buffer						m_bufferMaterialParameters; // Array of MaterialParameters.
+	optix::Buffer						m_bufferLightParameters; // Array of LightsParameters.
 
 	bool   m_present; // This controls if the texture image is updated per launch or only once a second.
 	bool   m_presentNext;

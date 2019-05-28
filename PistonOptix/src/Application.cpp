@@ -14,7 +14,6 @@
 #include <iostream>
 #include <sstream>
 
-
 // DAR Only for sutil::samplesPTXDir() and sutil::writeBufferToFile()
 #include <sutil.h>
 #include "inc/MyAssert.h"
@@ -22,6 +21,7 @@
 #define STATIC_CAST(type, val) static_cast<type>(val)
 
 const char* const SAMPLE_NAME = "PistonOptix";
+const int NUMBER_OF_LIGHT_INDICES = 2;
 
 // This only runs inside the OptiX Advanced Samples location,
 // unless the environment variable OPTIX_SAMPLES_SDK_PTX_DIR is set.
@@ -42,7 +42,7 @@ static std::string getFileName(const std::string& s) {
 #endif
 
 	size_t i = s.rfind(sep, s.length());
-	if (i != std::string::npos) 
+	if (i != std::string::npos)
 	{
 		return(s.substr(i + 1, s.length() - i));
 	}
@@ -350,7 +350,6 @@ void Application::initOpenGL()
 	initGLSL();
 }
 
-
 void Application::initOptiX()
 {
 	try
@@ -463,7 +462,6 @@ void Application::initRenderer()
 	}
 }
 
-
 void Application::initScene()
 {
 	try
@@ -504,7 +502,6 @@ void Application::restartAccumulation()
 
 	m_timer.restart();
 }
-
 
 bool Application::render()
 {
@@ -570,18 +567,18 @@ bool Application::render()
 		}
 		else
 #endif
-		if (m_presentAtSecond < seconds)
-		{
-			m_presentAtSecond = ceil(seconds);
-			const double fps = double(m_iterationIndex) / seconds;
-			std::ostringstream stream;
-			stream.precision(3); // Precision is # digits in fraction part.
-			// m_iterationIndex has already been incremented for the last rendered frame, so it is the actual frame count here.
-			stream << std::fixed << m_iterationIndex << " / " << seconds << " = " << fps << " fps";
-			std::cout << stream.str() << std::endl;
+			if (m_presentAtSecond < seconds)
+			{
+				m_presentAtSecond = ceil(seconds);
+				const double fps = double(m_iterationIndex) / seconds;
+				std::ostringstream stream;
+				stream.precision(3); // Precision is # digits in fraction part.
+				// m_iterationIndex has already been incremented for the last rendered frame, so it is the actual frame count here.
+				stream << std::fixed << m_iterationIndex << " / " << seconds << " = " << fps << " fps";
+				std::cout << stream.str() << std::endl;
 
-			m_presentNext = true; // Present at least every second.
-		}
+				m_presentNext = true; // Present at least every second.
+			}
 	}
 	catch (optix::Exception& e)
 	{
@@ -598,14 +595,14 @@ void Application::display() const
 	glUseProgram(m_glslProgram);
 
 	glBegin(GL_QUADS);
-		glTexCoord2f(0.0f, 0.0f);
-		glVertex2f(-1.0f, -1.0f);
-		glTexCoord2f(1.0f, 0.0f);
-		glVertex2f(1.0f, -1.0f);
-		glTexCoord2f(1.0f, 1.0f);
-		glVertex2f(1.0f, 1.0f);
-		glTexCoord2f(0.0f, 1.0f);
-		glVertex2f(-1.0f, 1.0f);
+	glTexCoord2f(0.0f, 0.0f);
+	glVertex2f(-1.0f, -1.0f);
+	glTexCoord2f(1.0f, 0.0f);
+	glVertex2f(1.0f, -1.0f);
+	glTexCoord2f(1.0f, 1.0f);
+	glVertex2f(1.0f, 1.0f);
+	glTexCoord2f(0.0f, 1.0f);
+	glVertex2f(-1.0f, 1.0f);
 	glEnd();
 
 	glUseProgram(0);
@@ -1052,10 +1049,9 @@ void Application::guiEventHandler()
 			m_pinholeCamera.pan(x, y);
 		}
 		break;
-	default: ;
+	default:;
 	}
 }
-
 
 void Application::createGeometryFromOBJ(std::string objPath, uint materialID, float * transform)
 {
@@ -1158,9 +1154,25 @@ void Application::initPrograms()
 		// Material programs. There are only three Material nodes, opaque, cutout opacity and rectangle lights.
 		// For the radiance ray type 0:
 		m_mapOfPrograms["closesthit"] = m_context->createProgramFromPTXFile(ptxPath("closesthit.cu"), "closesthit");
+		// For the radiance ray type 1:
+		m_mapOfPrograms["any_hit"] = m_context->createProgramFromPTXFile(ptxPath("closesthit.cu"), "any_hit");
 
+
+		initBRDFPrograms();
+		initLightProgrames();
+
+	}
+	catch (optix::Exception& e)
+	{
+		std::cerr << e.getErrorString() << std::endl;
+	}
+}
+
+void Application::initBRDFPrograms()
+{
+	try
+	{
 		Program prg;
-
 		// BRDF Sampling function
 		m_bufferBRDFSample = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, EBrdfTypes::NUM_OF_BRDF);
 		int* brdfSample = (int*)m_bufferBRDFSample->map(0, RT_BUFFER_MAP_WRITE_DISCARD);
@@ -1196,7 +1208,29 @@ void Application::initPrograms()
 		brdfPDF[EBrdfTypes::MICROFACET_REFLECTION] = prg->getId();
 		m_bufferBRDFPdf->unmap();
 		m_context["sysBRDFPdf"]->setBuffer(m_bufferBRDFPdf);
+	}
+	catch (optix::Exception& e)
+	{
+		std::cerr << e.getErrorString() << std::endl;
+	}
+}
 
+void Application::initLightProgrames()
+{
+	try 
+	{
+		Program prg;
+		// Light sampling functions.
+		m_bufferLightSample = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, NUMBER_OF_LIGHT_INDICES);
+		int* lightsample = (int*)m_bufferLightSample->map(0, RT_BUFFER_MAP_WRITE_DISCARD);
+		prg = m_context->createProgramFromPTXFile(ptxPath("LightSample.cu"), "sphere_sample");
+		lightsample[ELightType::SPHERE] = prg->getId();
+		prg = m_context->createProgramFromPTXFile(ptxPath("LightSample.cu"), "quad_sample");
+		lightsample[ELightType::QUAD] = prg->getId();
+		prg = m_context->createProgramFromPTXFile(ptxPath("LightSample.cu"), "directional_sample");
+		lightsample[ELightType::DIRECTIONAL] = prg->getId();
+		m_bufferLightSample->unmap();
+		m_context["sysLightSample"]->setBuffer(m_bufferLightSample);
 	}
 	catch (optix::Exception& e)
 	{
@@ -1220,6 +1254,24 @@ void Application::updateMaterialParameters()
 	}
 
 	m_bufferMaterialParameters->unmap();
+}
+
+void Application::updateLightParameters()
+{
+	LightParameter* dst = static_cast<LightParameter*>(m_bufferLightParameters->map(0, RT_BUFFER_MAP_WRITE_DISCARD));
+	for (size_t i = 0; i < m_lightsList.size(); ++i, ++dst) {
+		LightParameter mat = m_lightsList[i];
+
+		dst->position = mat.position;
+		dst->emission = mat.emission;
+		dst->radius = mat.radius;
+		dst->area = mat.area;
+		dst->u = mat.u;
+		dst->v = mat.v;
+		dst->direction = mat.direction;
+		dst->lightType = mat.lightType;
+	}
+	m_bufferLightParameters->unmap();
 }
 
 void Application::initMaterials()
@@ -1264,9 +1316,39 @@ void Application::initMaterials()
 
 		// Used for all objects in the scene.
 		m_opaqueMaterial = m_context->createMaterial();
+		
 		it = m_mapOfPrograms.find("closesthit");
 		MY_ASSERT(it != m_mapOfPrograms.end());
 		m_opaqueMaterial->setClosestHitProgram(0, it->second); // raytype radiance
+		
+		it = m_mapOfPrograms.find("any_hit");
+		MY_ASSERT(it != m_mapOfPrograms.end());
+		m_opaqueMaterial->setAnyHitProgram(1, it->second); // raytype shadow
+	}
+	catch (optix::Exception& e)
+	{
+		std::cerr << e.getErrorString() << std::endl;
+	}
+}
+
+void Application::initLights()
+{
+	LightParameter directionalLight;
+	directionalLight.emission = optix::make_float3(1.0f, 1.0f, 1.0f);
+	directionalLight.lightType = ELightType::DIRECTIONAL;
+	directionalLight.direction = optix::normalize(optix::make_float3(-1.0f, 1.0f, 1.0f));
+	m_lightsList.push_back(directionalLight);
+
+	try
+	{
+		m_bufferLightParameters = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_USER);
+		m_bufferLightParameters->setElementSize(sizeof(LightParameter));
+		m_bufferLightParameters->setSize(m_lightsList.size());
+
+		updateLightParameters();
+		
+		m_context["sysLightParameters"]->setBuffer(m_bufferLightParameters);
+		m_context["sysNumberOfLights"]->setInt(static_cast<int>(m_lightsList.size()));
 	}
 	catch (optix::Exception& e)
 	{
@@ -1279,6 +1361,8 @@ void Application::initMaterials()
 void Application::createScene()
 {
 	initMaterials();
+	initLights();
+	
 
 	try
 	{
@@ -1333,15 +1417,15 @@ void Application::createScene()
 
 		float trafoOBJ[16] =
 		{
-		  1.0f, 0.0f, 0.0f, /*tx*/0.0f,  
+		  1.0f, 0.0f, 0.0f, /*tx*/0.0f,
 		  0.0f, 1.0f, 0.0f, /*ty*/0.0f,
 		  0.0f, 0.0f, 1.0f, /*tz*/3.0f,
 		  0.0f, 0.0f, 0.0f, 1.0f
 		};
 
-		const std::string objMatFilepath = std::string(sutil::samplesDir()) + 
+		const std::string objMatFilepath = std::string(sutil::samplesDir()) +
 			R"(\resources\Models\OBJFiles\ShaderBall\BallMainCentMatL1.obj)";
-		const std::string objStandFilepath = std::string(sutil::samplesDir()) + 
+		const std::string objStandFilepath = std::string(sutil::samplesDir()) +
 			R"(\resources\Models\OBJFiles\ShaderBall\BallStandCentMatL1.obj)";
 
 		createGeometryFromOBJ(objMatFilepath, 2, trafoOBJ);
@@ -1386,7 +1470,7 @@ optix::Geometry Application::LoadOBJ(std::string inputfile)
 			int fv = shape.mesh.num_face_vertices[f];
 
 			// Loop over vertices in the face.
-			for (size_t v = 0; v < fv; v++) 
+			for (size_t v = 0; v < fv; v++)
 			{
 				// access to vertex
 				tinyobj::index_t idx = shape.mesh.indices[index_offset + v];
@@ -1401,7 +1485,7 @@ optix::Geometry Application::LoadOBJ(std::string inputfile)
 
 				tinyobj::real_t tx = 0.0f;
 				tinyobj::real_t ty = 1.0f;
-				if (idx.texcoord_index != -1) 
+				if (idx.texcoord_index != -1)
 				{
 					tx = attrib.texcoords[2 * idx.texcoord_index + 0];
 					ty = attrib.texcoords[2 * idx.texcoord_index + 1];

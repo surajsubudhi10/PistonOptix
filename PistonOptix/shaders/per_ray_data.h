@@ -30,4 +30,9 @@ struct PerRayData
 	unsigned int  seed;           // Random number generator input.
 };
 
+struct ShadowPRD
+{
+	optix::float3 attenuation;
+};
+
 #endif // PER_RAY_DATA_H
