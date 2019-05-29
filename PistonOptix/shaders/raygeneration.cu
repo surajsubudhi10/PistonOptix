@@ -69,6 +69,7 @@ RT_FUNCTION void integrator(PerRayData& prd, float3& radiance)
 	{
 		prd.wo = -prd.wi;						// wi is the next path segment ray.direction. wo is the direction to the observer.
 		prd.flags = 0;							// Clear all non-persistent flags. None in this version.
+		prd.brdf_flags = 0;						// As the ray didn't hit something its brdf flags need be cleared out
 
 		// Note that the primary rays wouldn't need to offset the ray t_min by sysSceneEpsilon.
 		optix::Ray ray = optix::make_Ray(prd.hit_pos, prd.wi, 0, sysSceneEpsilon, RT_DEFAULT_MAX);
@@ -117,7 +118,6 @@ RT_PROGRAM void raygeneration()
 	prd.wi = optix::normalize(ndc.x * sysCameraU + ndc.y * sysCameraV + sysCameraW);
 
 	float3 radiance;
-
 	integrator(prd, radiance); // In this case a unidirectional path tracer.
 
 #if !USE_SHADER_TONEMAP

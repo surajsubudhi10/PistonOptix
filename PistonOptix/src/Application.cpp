@@ -21,7 +21,6 @@
 #define STATIC_CAST(type, val) static_cast<type>(val)
 
 const char* const SAMPLE_NAME = "PistonOptix";
-const int NUMBER_OF_LIGHT_INDICES = 2;
 
 // This only runs inside the OptiX Advanced Samples location,
 // unless the environment variable OPTIX_SAMPLES_SDK_PTX_DIR is set.
@@ -1221,7 +1220,7 @@ void Application::initLightProgrames()
 	{
 		Program prg;
 		// Light sampling functions.
-		m_bufferLightSample = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, NUMBER_OF_LIGHT_INDICES);
+		m_bufferLightSample = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, ELightType::NUM_OF_LIGHT_TYPE);
 		int* lightsample = (int*)m_bufferLightSample->map(0, RT_BUFFER_MAP_WRITE_DISCARD);
 		prg = m_context->createProgramFromPTXFile(ptxPath("LightSample.cu"), "sphere_sample");
 		lightsample[ELightType::SPHERE] = prg->getId();
@@ -1334,7 +1333,7 @@ void Application::initMaterials()
 void Application::initLights()
 {
 	LightParameter directionalLight;
-	directionalLight.emission = optix::make_float3(1.0f, 1.0f, 1.0f);
+	directionalLight.emission = optix::make_float3(10.0f, 10.0f, 10.0f);
 	directionalLight.lightType = ELightType::DIRECTIONAL;
 	directionalLight.direction = optix::normalize(optix::make_float3(-1.0f, 1.0f, 1.0f));
 	m_lightsList.push_back(directionalLight);

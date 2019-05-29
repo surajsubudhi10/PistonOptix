@@ -24,9 +24,9 @@ rtDeclareVariable(ShadowPRD, prd_shadow, rtPayload, );
 
 // Attributes.
 rtDeclareVariable(optix::float3, varGeoNormal, attribute GEO_NORMAL, );
-rtDeclareVariable(optix::float3, varTangent,   attribute TANGENT, );
+rtDeclareVariable(optix::float3, varTangent, attribute TANGENT, );
 rtDeclareVariable(optix::float3, varNormal, attribute NORMAL, );
-rtDeclareVariable(optix::float3, varTexCoord,  attribute TEXCOORD, ); 
+rtDeclareVariable(optix::float3, varTexCoord, attribute TEXCOORD, );
 
 // Material parameter definition.
 rtBuffer<MaterialParameter> sysMaterialParameters; // Context global buffer with an array of structures of MaterialParameter.
@@ -39,6 +39,7 @@ rtBuffer< rtCallableProgramId<float3(MaterialParameter &mat, State &state, PerRa
 
 rtBuffer< rtCallableProgramId<void(LightParameter &light, PerRayData &prd, LightSample &sample)> > sysLightSample;
 rtBuffer<LightParameter> sysLightParameters;
+rtDeclareVariable(int, sysNumberOfLights, , );
 
 RT_FUNCTION float sdot(float3 x, float3 y)
 {
@@ -57,7 +58,7 @@ RT_PROGRAM void closesthit()
 	float3 shading_normal = optix::normalize(rtTransformNormal(RT_OBJECT_TO_WORLD, varNormal));
 
 	// Advance the path to the hit position in world coordinates.
-	thePrd.hit_pos = theRay.origin + theRay.direction * theIntersectionDistance; 
+	thePrd.hit_pos = theRay.origin + theRay.direction * theIntersectionDistance;
 
 	// Explicitly include edge-on cases as frontface condition! (Important for nested materials shown in a later example.)
 	thePrd.flags |= (0.0f <= optix::dot(thePrd.wo, geoNormal)) ? FLAG_FRONTFACE : 0;
@@ -73,6 +74,7 @@ RT_PROGRAM void closesthit()
 	State state;
 	state.hit_position = thePrd.hit_pos;
 	state.shading_normal = shading_normal;
+	state.geometry_normal = geoNormal;
 
 	// A material system with support for arbitrary mesh lights would evaluate its emission here.
 	thePrd.radiance = make_float3(0.0f);
@@ -82,23 +84,24 @@ RT_PROGRAM void closesthit()
 	thePrd.pdf = 0.0f;
 
 	MaterialParameter mat = sysMaterialParameters[parMaterialIndex];
-
 	float3 baseColor = mat.albedo;
 	float metallic = mat.metallic;
 
 	float3 diffuseBRDF = make_float3(0.0f);
 	float3 specularBRDF = make_float3(0.0f);
 
-	float diffChance = intensity(baseColor);
-
 	// Roulette-select the ray's path
 	float roulette = rng(thePrd.seed);
-	if (roulette < diffChance) 
+	float diffChance = 0.5f * (1.0f - mat.metallic);
+	if (roulette < diffChance)
 	{
 		// Diffuse reflection
 		sysBRDFSample[EBrdfTypes::LAMBERT](mat, state, thePrd);
 		sysBRDFPdf[EBrdfTypes::LAMBERT](mat, state, thePrd);
 		diffuseBRDF = sysBRDFEval[EBrdfTypes::LAMBERT](mat, state, thePrd);
+
+		thePrd.brdf_flags |= BSDF_REFLECTION;
+		thePrd.brdf_flags |= BSDF_DIFFUSE;
 	}
 	else
 	{
@@ -106,6 +109,9 @@ RT_PROGRAM void closesthit()
 		sysBRDFSample[EBrdfTypes::MICROFACET_REFLECTION](mat, state, thePrd);
 		sysBRDFPdf[EBrdfTypes::MICROFACET_REFLECTION](mat, state, thePrd);
 		specularBRDF = sysBRDFEval[EBrdfTypes::MICROFACET_REFLECTION](mat, state, thePrd);
+
+		thePrd.brdf_flags |= BSDF_REFLECTION;
+		thePrd.brdf_flags |= (mat.roughness > 0.0f) ? BSDF_GLOSSY : BSDF_SPECULAR;
 	}
 
 	float3 wiWorld = thePrd.wi;
@@ -115,9 +121,7 @@ RT_PROGRAM void closesthit()
 	float3 dielectricSpecular = make_float3(0.04f, 0.04f, 0.04f);
 	float3 F0 = lerp(dielectricSpecular, baseColor, metallic);
 	float3 F = F0 + (1.0f - F0) * powf(1.0f - dot(wiWorld, H), 5.0f);
-
 	float3 f = (1.0f - F) * diffuseBRDF + specularBRDF;
-	
 
 	// Do not sample opaque surfaces below the geometry!
 	// Mind that the geometry normal has been flipped to the side the ray points at.
@@ -127,38 +131,55 @@ RT_PROGRAM void closesthit()
 		return;
 	}
 
-	
 	thePrd.f_over_pdf = f * fabsf(optix::dot(thePrd.wi, state.shading_normal)) / thePrd.pdf;
 
-	// Add direct light sample weighted by shadow term and 1/probability.
-	// The pdf for a directional area light is 1/solid_angle.
+#if USE_NEXT_EVENT_ESTIMATION
+	// Direct lighting if the sampled BSDF was diffuse and any light is in the scene.
 
-	const LightParameter& light = sysLightParameters[0];
-	const float3 light_center = state.hit_position + light.direction;
-	const float r1 = rng(thePrd.seed);
-	const float r2 = rng(thePrd.seed);
-	const float2 disk_sample = square_to_disk(make_float2(r1, r2));
-	const float3 jittered_pos = light_center + light.radius*disk_sample.x*light.u + light.radius*disk_sample.y*light.v;
-	const float3 L = normalize(jittered_pos - state.hit_position);
-
-	const float NdotL = dot(state.shading_normal, L);
-	if (NdotL > 0.0f) 
+	if ((thePrd.brdf_flags & (BSDF_DIFFUSE /*| BSDF_GLOSSY*/)) && 0 < sysNumberOfLights)
 	{
-		ShadowPRD shadow_prd;
-		shadow_prd.attenuation = make_float3(1.0f);
+		LightSample lightSample; // Sample one of many lights.
+		lightSample.index = optix::clamp(static_cast<int>(floorf(rng(thePrd.seed) * sysNumberOfLights)), 0, sysNumberOfLights - 1);
+		LightParameter light = sysLightParameters[lightSample.index];
+		const ELightType lightType = light.lightType;
+		lightSample.distance = RT_DEFAULT_MAX;
 
-		optix::Ray shadow_ray(state.hit_position, L, /*shadow ray type*/ 1, 0.0f);
-		rtTrace(sysTopObject, shadow_ray, shadow_prd);
+		sysLightSample[lightType](light, thePrd, lightSample); // lightSample direction and distance returned in world space!
 
-		const float solid_angle = light.radius*light.radius*M_PIf;
-		thePrd.radiance += NdotL * light.emission * 0.001f * solid_angle * shadow_prd.attenuation;
+		if (0.0f < lightSample.pdf) // Useful light sample?
+		{
+			// Lambert evaluation
+			// Evaluate the Lambert BSDF in the light sample direction. Normally cheaper than shooting rays.
+			sysBRDFPdf[EBrdfTypes::LAMBERT](mat, state, thePrd);
+			const float3 f = sysBRDFEval[EBrdfTypes::LAMBERT](mat, state, thePrd);
+			const float  pdf = thePrd.pdf;
+
+			if (0.0f < pdf && isNotNull(f))
+			{
+				// Do the visibility check of the light sample.
+				ShadowPRD prdShadow;
+				prdShadow.visible = true; // Initialize for miss.
+
+				// Note that the sysSceneEpsilon is applied on both sides of the shadow ray [t_min, t_max] interval 
+				// to prevent self intersections with the actual light geometry in the scene!
+				optix::Ray ray = optix::make_Ray(thePrd.hit_pos, lightSample.direction, 1, sysSceneEpsilon, lightSample.distance - sysSceneEpsilon); // Shadow ray.
+				rtTrace(sysTopObject, ray, prdShadow);
+
+				if (prdShadow.visible)
+				{
+					const float misWeight = powerHeuristic(lightSample.pdf, pdf);
+					thePrd.radiance += f * lightSample.emission * (misWeight * optix::dot(lightSample.direction, shading_normal) / lightSample.pdf);
+				}
+			}
+		}
 	}
+#endif // USE_NEXT_EVENT_ESTIMATION
 }
 
 RT_PROGRAM void any_hit()
 {
-	prd_shadow.attenuation = make_float3(0.0f);
+	prd_shadow.visible = false;
 	rtTerminateRay();
-	
+
 	thePrd.flags |= FLAG_TERMINATE;
 }

@@ -10,7 +10,9 @@ enum ELightType
 {
 	SPHERE,
 	QUAD,
-	DIRECTIONAL
+	DIRECTIONAL,
+
+	NUM_OF_LIGHT_TYPE
 };
 
 struct LightParameter
@@ -28,9 +30,11 @@ struct LightParameter
 struct LightSample
 {
 	optix::float3 surfacePos;
+	int           index;
 	optix::float3 direction;
+	float         distance;
 	optix::float3 emission;
-	float pdf;
+	float         pdf;
 };
 
 #endif // LIGHT_PARAMETERS_H

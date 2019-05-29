@@ -11,6 +11,7 @@ struct State
 {
 	optix::float3 hit_position;
 	optix::float3 shading_normal;
+	optix::float3 geometry_normal;
 };
 
 #endif

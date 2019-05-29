@@ -43,9 +43,9 @@ RT_CALLABLE_PROGRAM void quad_sample(LightParameter &light, PerRayData &prd, Lig
 	sample.pdf = -1.0f;
 }
 
-//RT_CALLABLE_PROGRAM void directional_sample(LightParameter &light, PerRayData &prd, LightSample &sample)
-//{
-//	sample.direction = light.direction;
-//	sample.emission = light.emission * sysNumberOfLights;
-//	sample.pdf = 1.0f;
-//}
+RT_CALLABLE_PROGRAM void directional_sample(LightParameter &light, PerRayData &prd, LightSample &sample)
+{
+	sample.direction = light.direction;
+	sample.emission = light.emission * sysNumberOfLights;
+	sample.pdf = 1.0f;
+}
