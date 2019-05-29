@@ -136,7 +136,7 @@ RT_PROGRAM void closesthit()
 #if USE_NEXT_EVENT_ESTIMATION
 	// Direct lighting if the sampled BSDF was diffuse and any light is in the scene.
 
-	if ((thePrd.brdf_flags & (BSDF_DIFFUSE /*| BSDF_GLOSSY*/)) && 0 < sysNumberOfLights)
+	if ((thePrd.brdf_flags & (BSDF_DIFFUSE | BSDF_GLOSSY)) && 0 < sysNumberOfLights)
 	{
 		LightSample lightSample; // Sample one of many lights.
 		lightSample.index = optix::clamp(static_cast<int>(floorf(rng(thePrd.seed) * sysNumberOfLights)), 0, sysNumberOfLights - 1);
@@ -146,13 +146,26 @@ RT_PROGRAM void closesthit()
 
 		sysLightSample[lightType](light, thePrd, lightSample); // lightSample direction and distance returned in world space!
 
-		if (0.0f < lightSample.pdf) // Useful light sample?
+		if (lightSample.pdf > 0.0f) // Useful light sample?
 		{
-			// Lambert evaluation
-			// Evaluate the Lambert BSDF in the light sample direction. Normally cheaper than shooting rays.
-			sysBRDFPdf[EBrdfTypes::LAMBERT](mat, state, thePrd);
-			const float3 f = sysBRDFEval[EBrdfTypes::LAMBERT](mat, state, thePrd);
-			const float  pdf = thePrd.pdf;
+			float3 f = make_float3(0.0f);
+			float pdf = 0.0f;
+
+			if (thePrd.brdf_flags & BSDF_DIFFUSE) 
+			{
+				// Diffuse evaluation
+				// Evaluate the Lambert BSDF in the light sample direction. Normally cheaper than shooting rays.
+				sysBRDFPdf[EBrdfTypes::LAMBERT](mat, state, thePrd);
+				f = sysBRDFEval[EBrdfTypes::LAMBERT](mat, state, thePrd);
+				pdf = thePrd.pdf;
+			}
+			else if (thePrd.brdf_flags & BSDF_GLOSSY) 
+			{
+				// Specular evaluation
+				sysBRDFPdf[EBrdfTypes::MICROFACET_REFLECTION](mat, state, thePrd);
+				f = sysBRDFEval[EBrdfTypes::MICROFACET_REFLECTION](mat, state, thePrd);
+				pdf = thePrd.pdf;
+			}
 
 			if (0.0f < pdf && isNotNull(f))
 			{
