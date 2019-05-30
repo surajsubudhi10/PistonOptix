@@ -127,7 +127,7 @@ Application::Application(GLFWwindow* window,
 
 	// Renderer setup and GUI parameters.
 	m_minPathLength = 2;    // Minimum path length after which Russian Roulette path termination starts.
-	m_maxPathLength = 5;    // Maximum path length. (Need at least 6 path segments to go through a glass sphere, hit something, and back through that sphere to the viewer.)
+	m_maxPathLength = 5;    // Maximum path length. 
 	m_sceneEpsilonFactor = 500;  // Factor on 1e-7 used to offset ray origins along the path to reduce self intersections. 
 
 	m_present = false;  // Update once per second. (The first half second shows all frames to get some initial accumulation).
@@ -144,14 +144,15 @@ Application::Application(GLFWwindow* window,
 	m_glslProgram = 0;
 
 	// Settings normally used.
-	//m_gamma          = 2.2f;
-	//m_colorBalance   = optix::make_float3(1.0f);
-	//m_whitePoint     = 1.0f;
-	//m_burnHighlights = 0.8f;
-	//m_crushBlacks    = 0.2f;
-	//m_saturation     = 1.2f;
-	//m_brightness     = 0.8f;
+	m_gamma          = 2.2f;
+	m_colorBalance   = optix::make_float3(1.0f);
+	m_whitePoint     = 1.0f;
+	m_burnHighlights = 0.8f;
+	m_crushBlacks    = 0.2f;
+	m_saturation     = 1.2f;
+	m_brightness     = 0.8f;
 
+	/*
 	// Neutral tonemapper settings.
 	// This sample begins with an Ambient Occlusion like rendering setup. Make sure the the image stays white.
 	m_gamma = 2.2f; // Neutral would be 1.0f.
@@ -161,6 +162,7 @@ Application::Application(GLFWwindow* window,
 	m_crushBlacks = 0.0f;
 	m_saturation = 1.0f;
 	m_brightness = 1.0f;
+	*/
 
 	m_guiState = GUI_STATE_NONE;
 	m_isWindowVisible = true;
@@ -1052,11 +1054,11 @@ void Application::guiEventHandler()
 	}
 }
 
-void Application::createGeometryFromOBJ(std::string objPath, uint materialID, float * transform)
+void Application::createGeometry(optix::Geometry& geometry, uint materialID, float * transform)
 {
 	try
 	{
-		optix::Geometry geometry = LoadOBJ(objPath);
+		//optix::Geometry geometry = LoadOBJ(objPath);
 
 		optix::GeometryInstance giGeo = m_context->createGeometryInstance(); // This connects Geometries with Materials.
 		giGeo->setGeometry(geometry);
@@ -1173,38 +1175,38 @@ void Application::initBRDFPrograms()
 	{
 		Program prg;
 		// BRDF Sampling function
-		m_bufferBRDFSample = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, EBrdfTypes::NUM_OF_BRDF);
+		m_bufferBRDFSample = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, POptix::EBrdfTypes::NUM_OF_BRDF);
 		int* brdfSample = (int*)m_bufferBRDFSample->map(0, RT_BUFFER_MAP_WRITE_DISCARD);
 		prg = m_context->createProgramFromPTXFile(ptxPath("lambert.cu"), "Sample");
-		brdfSample[EBrdfTypes::LAMBERT] = prg->getId();
+		brdfSample[POptix::EBrdfTypes::LAMBERT] = prg->getId();
 		prg = m_context->createProgramFromPTXFile(ptxPath("PhongModified.cu"), "Sample");
-		brdfSample[EBrdfTypes::PHONG] = prg->getId();
+		brdfSample[POptix::EBrdfTypes::PHONG] = prg->getId();
 		prg = m_context->createProgramFromPTXFile(ptxPath("MicrofacetReflection.cu"), "Sample");
-		brdfSample[EBrdfTypes::MICROFACET_REFLECTION] = prg->getId();
+		brdfSample[POptix::EBrdfTypes::MICROFACET_REFLECTION] = prg->getId();
 		m_bufferBRDFSample->unmap();
 		m_context["sysBRDFSample"]->setBuffer(m_bufferBRDFSample);
 
 		// BRDF Eval function
-		m_bufferBRDFEval = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, EBrdfTypes::NUM_OF_BRDF);
+		m_bufferBRDFEval = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, POptix::EBrdfTypes::NUM_OF_BRDF);
 		int* brdfEval = (int*)m_bufferBRDFEval->map(0, RT_BUFFER_MAP_WRITE_DISCARD);
 		prg = m_context->createProgramFromPTXFile(ptxPath("lambert.cu"), "Eval");
-		brdfEval[EBrdfTypes::LAMBERT] = prg->getId();
+		brdfEval[POptix::EBrdfTypes::LAMBERT] = prg->getId();
 		prg = m_context->createProgramFromPTXFile(ptxPath("PhongModified.cu"), "Eval");
-		brdfEval[EBrdfTypes::PHONG] = prg->getId();
+		brdfEval[POptix::EBrdfTypes::PHONG] = prg->getId();
 		prg = m_context->createProgramFromPTXFile(ptxPath("MicrofacetReflection.cu"), "Eval");
-		brdfEval[EBrdfTypes::MICROFACET_REFLECTION] = prg->getId();
+		brdfEval[POptix::EBrdfTypes::MICROFACET_REFLECTION] = prg->getId();
 		m_bufferBRDFEval->unmap();
 		m_context["sysBRDFEval"]->setBuffer(m_bufferBRDFEval);
 
 		// BRDF PDF function
-		m_bufferBRDFPdf = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, EBrdfTypes::NUM_OF_BRDF);
+		m_bufferBRDFPdf = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, POptix::EBrdfTypes::NUM_OF_BRDF);
 		int* brdfPDF = (int*)m_bufferBRDFPdf->map(0, RT_BUFFER_MAP_WRITE_DISCARD);
 		prg = m_context->createProgramFromPTXFile(ptxPath("lambert.cu"), "PDF");
-		brdfPDF[EBrdfTypes::LAMBERT] = prg->getId();
+		brdfPDF[POptix::EBrdfTypes::LAMBERT] = prg->getId();
 		prg = m_context->createProgramFromPTXFile(ptxPath("PhongModified.cu"), "PDF");
-		brdfPDF[EBrdfTypes::PHONG] = prg->getId();
+		brdfPDF[POptix::EBrdfTypes::PHONG] = prg->getId();
 		prg = m_context->createProgramFromPTXFile(ptxPath("MicrofacetReflection.cu"), "PDF");
-		brdfPDF[EBrdfTypes::MICROFACET_REFLECTION] = prg->getId();
+		brdfPDF[POptix::EBrdfTypes::MICROFACET_REFLECTION] = prg->getId();
 		m_bufferBRDFPdf->unmap();
 		m_context["sysBRDFPdf"]->setBuffer(m_bufferBRDFPdf);
 	}
@@ -1220,14 +1222,14 @@ void Application::initLightProgrames()
 	{
 		Program prg;
 		// Light sampling functions.
-		m_bufferLightSample = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, ELightType::NUM_OF_LIGHT_TYPE);
+		m_bufferLightSample = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, POptix::ELightType::NUM_OF_LIGHT_TYPE);
 		int* lightsample = (int*)m_bufferLightSample->map(0, RT_BUFFER_MAP_WRITE_DISCARD);
 		prg = m_context->createProgramFromPTXFile(ptxPath("LightSample.cu"), "sphere_sample");
-		lightsample[ELightType::SPHERE] = prg->getId();
+		lightsample[POptix::ELightType::SPHERE] = prg->getId();
 		prg = m_context->createProgramFromPTXFile(ptxPath("LightSample.cu"), "quad_sample");
-		lightsample[ELightType::QUAD] = prg->getId();
+		lightsample[POptix::ELightType::QUAD] = prg->getId();
 		prg = m_context->createProgramFromPTXFile(ptxPath("LightSample.cu"), "directional_sample");
-		lightsample[ELightType::DIRECTIONAL] = prg->getId();
+		lightsample[POptix::ELightType::DIRECTIONAL] = prg->getId();
 		m_bufferLightSample->unmap();
 		m_context["sysLightSample"]->setBuffer(m_bufferLightSample);
 	}
@@ -1241,7 +1243,7 @@ void Application::updateMaterialParameters()
 {
 	// Convert the GUI material parameters to the device side structure and upload them into the context global buffer.
 	// (Doing this in a loop will make more sense in later examples.)
-	MaterialParameter* dst = static_cast<MaterialParameter*>(m_bufferMaterialParameters->map(0, RT_BUFFER_MAP_WRITE_DISCARD));
+	POptix::Material* dst = static_cast<POptix::Material*>(m_bufferMaterialParameters->map(0, RT_BUFFER_MAP_WRITE_DISCARD));
 
 	for (size_t i = 0; i < m_guiMaterialParameters.size(); ++i, ++dst)
 	{
@@ -1257,18 +1259,18 @@ void Application::updateMaterialParameters()
 
 void Application::updateLightParameters()
 {
-	LightParameter* dst = static_cast<LightParameter*>(m_bufferLightParameters->map(0, RT_BUFFER_MAP_WRITE_DISCARD));
-	for (size_t i = 0; i < m_lightsList.size(); ++i, ++dst) {
-		LightParameter mat = m_lightsList[i];
+	POptix::Light* dst = static_cast<POptix::Light*>(m_bufferLightParameters->map(0, RT_BUFFER_MAP_WRITE_DISCARD));
+	for (size_t i = 0; i < scene.mLightList.size(); ++i, ++dst) {
+		POptix::Light* mat = scene.mLightList[i];
 
-		dst->position = mat.position;
-		dst->emission = mat.emission;
-		dst->radius = mat.radius;
-		dst->area = mat.area;
-		dst->u = mat.u;
-		dst->v = mat.v;
-		dst->direction = mat.direction;
-		dst->lightType = mat.lightType;
+		dst->position	= mat->position;
+		dst->emission	= mat->emission;
+		dst->radius		= mat->radius;
+		dst->area		= mat->area;
+		dst->u			= mat->u;
+		dst->v			= mat->v;
+		dst->direction	= mat->direction;
+		dst->lightType	= mat->lightType;
 	}
 	m_bufferLightParameters->unmap();
 }
@@ -1276,8 +1278,16 @@ void Application::updateLightParameters()
 void Application::initMaterials()
 {
 	// Setup GUI material parameters, one for each of the objects in the scene.
-	MaterialParameterGUI parameters;
 
+	for each( POptix::Material* mat in scene.mMaterialList) 
+	{
+		MaterialParameterGUI parameters;
+		parameters.albedo = mat->albedo;
+		parameters.roughness = mat->roughness;
+		parameters.metallic = mat->metallic;
+		m_guiMaterialParameters.push_back(parameters);
+	}
+	/*
 	// Make all parameters white to show automatic ambient occlusion with a brute force full global illumination path tracer.
 	parameters.albedo = optix::make_float3(0.6f);
 	parameters.roughness = 1.0f;
@@ -1298,11 +1308,12 @@ void Application::initMaterials()
 	parameters.roughness = 1.0f;
 	parameters.metallic = 0.0f;
 	m_guiMaterialParameters.push_back(parameters); // 3, torus
+	*/
 
 	try
 	{
 		m_bufferMaterialParameters = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_USER);
-		m_bufferMaterialParameters->setElementSize(sizeof(MaterialParameter));
+		m_bufferMaterialParameters->setElementSize(sizeof(POptix::Material));
 		m_bufferMaterialParameters->setSize(m_guiMaterialParameters.size()); // As many as there are in the GUI.
 
 		updateMaterialParameters();
@@ -1332,16 +1343,18 @@ void Application::initMaterials()
 
 void Application::initLights()
 {
-	LightParameter directionalLight;
+	std::vector<POptix::Light*> m_lightsList = scene.mLightList;
+
+	POptix::Light directionalLight;
 	directionalLight.emission = optix::make_float3(10.0f, 10.0f, 10.0f);
-	directionalLight.lightType = ELightType::DIRECTIONAL;
+	directionalLight.lightType = POptix::ELightType::DIRECTIONAL;
 	directionalLight.direction = optix::normalize(optix::make_float3(-1.0f, 1.0f, 1.0f));
-	m_lightsList.push_back(directionalLight);
+	//m_lightsList.push_back(directionalLight);
 
 	try
 	{
 		m_bufferLightParameters = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_USER);
-		m_bufferLightParameters->setElementSize(sizeof(LightParameter));
+		m_bufferLightParameters->setElementSize(sizeof(POptix::Light));
 		m_bufferLightParameters->setSize(m_lightsList.size());
 
 		updateLightParameters();
@@ -1362,7 +1375,6 @@ void Application::createScene()
 	initMaterials();
 	initLights();
 	
-
 	try
 	{
 		// OptiX Scene Graph construction.
@@ -1373,6 +1385,17 @@ void Application::createScene()
 
 		m_context["sysTopObject"]->set(m_rootGroup); // This is where the rtTrace calls start the BVH traversal. (Same for radiance and shadow rays.)
 
+		for each(POptix::Node* node in scene.mNodeList) 
+		{
+			for each(POptix::Mesh* mesh in node->mMeshList) 
+			{
+				optix::Geometry geo = createGeometry(mesh->attributes, mesh->indices);
+				createGeometry(geo, node->materialID, node->transform);
+			}
+		}
+
+		/*
+		
 		unsigned int count;
 
 		// Demo code only!
@@ -1416,9 +1439,9 @@ void Application::createScene()
 
 		float trafoOBJ[16] =
 		{
-		  1.0f, 0.0f, 0.0f, /*tx*/0.0f,
-		  0.0f, 1.0f, 0.0f, /*ty*/0.0f,
-		  0.0f, 0.0f, 1.0f, /*tz*/3.0f,
+		  1.0f, 0.0f, 0.0f, /*tx*//*0.0f,
+		  0.0f, 1.0f, 0.0f, /*ty*//*0.0f,
+		  0.0f, 0.0f, 1.0f, /*tz*//*0.0f,
 		  0.0f, 0.0f, 0.0f, 1.0f
 		};
 
@@ -1427,8 +1450,11 @@ void Application::createScene()
 		const std::string objStandFilepath = std::string(sutil::samplesDir()) +
 			R"(\resources\Models\OBJFiles\ShaderBall\BallStandCentMatL1.obj)";
 
-		createGeometryFromOBJ(objMatFilepath, 2, trafoOBJ);
-		createGeometryFromOBJ(objStandFilepath, 1, trafoOBJ);
+		optix::Geometry geo01 = LoadOBJ(objMatFilepath);
+		createGeometry(geo01, 2, trafoOBJ);
+		optix::Geometry geo02 = LoadOBJ(objStandFilepath);
+		createGeometry(geo02, 1, trafoOBJ);
+		*/
 
 	}
 	catch (optix::Exception& e)

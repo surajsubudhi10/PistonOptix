@@ -6,82 +6,81 @@
 
 #include "inc/MyAssert.h"
 
-optix::Geometry Application::createTorus(const int tessU, const int tessV, const float innerRadius, const float outerRadius)
+namespace POptix
 {
-	MY_ASSERT(3 <= tessU && 3 <= tessV);
-
-	// The torus is a ring with radius outerRadius rotated around the y-axis along the circle with innerRadius.
-	/*           +y
-		___       |       ___
-	  /     \           /     \
-	 |       |    |    |       |
-	 |       |         |       |
-	  \ ___ /     |     \ ___ /
-						   <--->
-							outerRadius
-				  <------->
-				  innerRadius
-	*/
-
-	std::vector<VertexAttributes> attributes;
-	attributes.reserve((tessU + 1) * (tessV + 1));
-
-	std::vector<unsigned int> indices;
-	indices.reserve(8 * tessU * tessV);
-
-	const float u = (float)tessU;
-	const float v = (float)tessV;
-
-	float phi_step = 2.0f * M_PIf / u;
-	float theta_step = 2.0f * M_PIf / v;
-
-	// Setup vertices and normals.
-	// Generate the torus exactly like the sphere with rings around the origin along the latitudes.
-	for (int latitude = 0; latitude <= tessV; ++latitude) // theta angle
+	Mesh* Scene::createTorus(const int tessU, const int tessV, const float innerRadius, const float outerRadius)
 	{
-		const float theta = (float)latitude * theta_step;
-		const float sinTheta = sinf(theta);
-		const float cosTheta = cosf(theta);
+		MY_ASSERT(3 <= tessU && 3 <= tessV);
 
-		const float radius = innerRadius + outerRadius * cosTheta;
+		// The torus is a ring with radius outerRadius rotated around the y-axis along the circle with innerRadius.
+		/*           +y
+			___       |       ___
+		  /     \           /     \
+		 |       |    |    |       |
+		 |       |         |       |
+		  \ ___ /     |     \ ___ /
+							   <--->
+								outerRadius
+					  <------->
+					  innerRadius
+		*/
 
-		for (int longitude = 0; longitude <= tessU; ++longitude) // phi angle
+		POptix::Mesh* mesh = new POptix::Mesh;
+		mesh->attributes.reserve((tessU + 1) * (tessV + 1));
+		mesh->indices.reserve(8 * tessU * tessV);
+
+		const float u = (float)tessU;
+		const float v = (float)tessV;
+
+		float phi_step = 2.0f * M_PIf / u;
+		float theta_step = 2.0f * M_PIf / v;
+
+		// Setup vertices and normals.
+		// Generate the torus exactly like the sphere with rings around the origin along the latitudes.
+		for (int latitude = 0; latitude <= tessV; ++latitude) // theta angle
 		{
-			const float phi = (float)longitude * phi_step;
-			const float sinPhi = sinf(phi);
-			const float cosPhi = cosf(phi);
+			const float theta = (float)latitude * theta_step;
+			const float sinTheta = sinf(theta);
+			const float cosTheta = cosf(theta);
 
-			VertexAttributes attrib;
+			const float radius = innerRadius + outerRadius * cosTheta;
 
-			attrib.vertex = optix::make_float3(radius * cosPhi, outerRadius * sinTheta, radius * -sinPhi);
-			attrib.tangent = optix::make_float3(-sinPhi, 0.0f, -cosPhi);
-			attrib.normal = optix::make_float3(cosPhi * cosTheta, sinTheta, -sinPhi * cosTheta);
-			attrib.texcoord = optix::make_float3((float)longitude / u, (float)latitude / v, 0.0f);
+			for (int longitude = 0; longitude <= tessU; ++longitude) // phi angle
+			{
+				const float phi = (float)longitude * phi_step;
+				const float sinPhi = sinf(phi);
+				const float cosPhi = cosf(phi);
 
-			attributes.push_back(attrib);
+				VertexAttributes attrib;
+
+				attrib.vertex = optix::make_float3(radius * cosPhi, outerRadius * sinTheta, radius * -sinPhi);
+				attrib.tangent = optix::make_float3(-sinPhi, 0.0f, -cosPhi);
+				attrib.normal = optix::make_float3(cosPhi * cosTheta, sinTheta, -sinPhi * cosTheta);
+				attrib.texcoord = optix::make_float3((float)longitude / u, (float)latitude / v, 0.0f);
+
+				mesh->attributes.push_back(attrib);
+			}
 		}
-	}
 
-	// We have generated tessU + 1 vertices per latitude.
-	const unsigned int columns = tessU + 1;
+		// We have generated tessU + 1 vertices per latitude.
+		const unsigned int columns = tessU + 1;
 
-	// Setup indices
-	for (int latitude = 0; latitude < tessV; ++latitude)
-	{
-		for (int longitude = 0; longitude < tessU; ++longitude)
+		// Setup indices
+		for (int latitude = 0; latitude < tessV; ++latitude)
 		{
-			indices.push_back(latitude      * columns + longitude);  // lower left
-			indices.push_back(latitude      * columns + longitude + 1);  // lower right
-			indices.push_back((latitude + 1) * columns + longitude + 1);  // upper right
+			for (int longitude = 0; longitude < tessU; ++longitude)
+			{
+				mesh->indices.push_back(latitude      * columns + longitude);  // lower left
+				mesh->indices.push_back(latitude      * columns + longitude + 1);  // lower right
+				mesh->indices.push_back((latitude + 1) * columns + longitude + 1);  // upper right
 
-			indices.push_back((latitude + 1) * columns + longitude + 1);  // upper right
-			indices.push_back((latitude + 1) * columns + longitude);  // upper left
-			indices.push_back(latitude      * columns + longitude);  // lower left
+				mesh->indices.push_back((latitude + 1) * columns + longitude + 1);  // upper right
+				mesh->indices.push_back((latitude + 1) * columns + longitude);  // upper left
+				mesh->indices.push_back(latitude      * columns + longitude);  // lower left
+			}
 		}
+
+		std::cout << "createTorus(): Vertices = " << mesh->attributes.size() << ", Triangles = " << mesh->indices.size() / 3 << std::endl;
+		return mesh;
 	}
-
-	std::cout << "createTorus(): Vertices = " << attributes.size() << ", Triangles = " << indices.size() / 3 << std::endl;
-
-	return createGeometry(attributes, indices);
 }
-

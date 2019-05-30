@@ -28,17 +28,17 @@ rtDeclareVariable(optix::float3, varTangent, attribute TANGENT, );
 rtDeclareVariable(optix::float3, varNormal, attribute NORMAL, );
 rtDeclareVariable(optix::float3, varTexCoord, attribute TEXCOORD, );
 
-// Material parameter definition.
-rtBuffer<MaterialParameter> sysMaterialParameters; // Context global buffer with an array of structures of MaterialParameter.
-rtDeclareVariable(int, parMaterialIndex, , ); // Per Material index into the sysMaterialParameters array.
+// POptix::Material parameter definition.
+rtBuffer<POptix::Material> sysMaterialParameters; // Context global buffer with an array of structures of POptix::Material.
+rtDeclareVariable(int, parMaterialIndex, , ); // Per POptix::Material index into the sysMaterialParameters array.
 rtDeclareVariable(int, programId, , );
 
-rtBuffer< rtCallableProgramId<void(MaterialParameter &mat, State &state, PerRayData &prd)> > sysBRDFPdf;
-rtBuffer< rtCallableProgramId<void(MaterialParameter &mat, State &state, PerRayData &prd)> > sysBRDFSample;
-rtBuffer< rtCallableProgramId<float3(MaterialParameter &mat, State &state, PerRayData &prd)> > sysBRDFEval;
+rtBuffer< rtCallableProgramId<void(POptix::Material &mat, State &state, PerRayData &prd)> > sysBRDFPdf;
+rtBuffer< rtCallableProgramId<void(POptix::Material &mat, State &state, PerRayData &prd)> > sysBRDFSample;
+rtBuffer< rtCallableProgramId<float3(POptix::Material &mat, State &state, PerRayData &prd)> > sysBRDFEval;
 
-rtBuffer< rtCallableProgramId<void(LightParameter &light, PerRayData &prd, LightSample &sample)> > sysLightSample;
-rtBuffer<LightParameter> sysLightParameters;
+rtBuffer< rtCallableProgramId<void(POptix::Light &light, PerRayData &prd, POptix::LightSample &sample)> > sysLightSample;
+rtBuffer<POptix::Light> sysLightParameters;
 rtDeclareVariable(int, sysNumberOfLights, , );
 
 RT_FUNCTION float sdot(float3 x, float3 y)
@@ -83,7 +83,7 @@ RT_PROGRAM void closesthit()
 	thePrd.f_over_pdf = make_float3(0.0f);
 	thePrd.pdf = 0.0f;
 
-	MaterialParameter mat = sysMaterialParameters[parMaterialIndex];
+	POptix::Material mat = sysMaterialParameters[parMaterialIndex];
 	float3 baseColor = mat.albedo;
 	float metallic = mat.metallic;
 
@@ -96,22 +96,22 @@ RT_PROGRAM void closesthit()
 	if (roulette < diffChance)
 	{
 		// Diffuse reflection
-		sysBRDFSample[EBrdfTypes::LAMBERT](mat, state, thePrd);
-		sysBRDFPdf[EBrdfTypes::LAMBERT](mat, state, thePrd);
-		diffuseBRDF = sysBRDFEval[EBrdfTypes::LAMBERT](mat, state, thePrd);
+		sysBRDFSample[POptix::EBrdfTypes::LAMBERT](mat, state, thePrd);
+		sysBRDFPdf[POptix::EBrdfTypes::LAMBERT](mat, state, thePrd);
+		diffuseBRDF = sysBRDFEval[POptix::EBrdfTypes::LAMBERT](mat, state, thePrd);
 
-		thePrd.brdf_flags |= BSDF_REFLECTION;
-		thePrd.brdf_flags |= BSDF_DIFFUSE;
+		thePrd.brdf_flags |= POptix::BSDF_REFLECTION;
+		thePrd.brdf_flags |= POptix::BSDF_DIFFUSE;
 	}
 	else
 	{
 		// Specular reflection
-		sysBRDFSample[EBrdfTypes::MICROFACET_REFLECTION](mat, state, thePrd);
-		sysBRDFPdf[EBrdfTypes::MICROFACET_REFLECTION](mat, state, thePrd);
-		specularBRDF = sysBRDFEval[EBrdfTypes::MICROFACET_REFLECTION](mat, state, thePrd);
+		sysBRDFSample[POptix::EBrdfTypes::MICROFACET_REFLECTION](mat, state, thePrd);
+		sysBRDFPdf[POptix::EBrdfTypes::MICROFACET_REFLECTION](mat, state, thePrd);
+		specularBRDF = sysBRDFEval[POptix::EBrdfTypes::MICROFACET_REFLECTION](mat, state, thePrd);
 
-		thePrd.brdf_flags |= BSDF_REFLECTION;
-		thePrd.brdf_flags |= (mat.roughness > 0.0f) ? BSDF_GLOSSY : BSDF_SPECULAR;
+		thePrd.brdf_flags |= POptix::BSDF_REFLECTION;
+		thePrd.brdf_flags |= (mat.roughness > 0.0f) ? POptix::BSDF_GLOSSY : POptix::BSDF_SPECULAR;
 	}
 
 	float3 wiWorld = thePrd.wi;
@@ -134,40 +134,37 @@ RT_PROGRAM void closesthit()
 	thePrd.f_over_pdf = f * fabsf(optix::dot(thePrd.wi, state.shading_normal)) / thePrd.pdf;
 
 #if USE_NEXT_EVENT_ESTIMATION
-	// Direct lighting if the sampled BSDF was diffuse and any light is in the scene.
-
-	if ((thePrd.brdf_flags & (BSDF_DIFFUSE | BSDF_GLOSSY)) && 0 < sysNumberOfLights)
+	if ((thePrd.brdf_flags & (POptix::BSDF_DIFFUSE | POptix::BSDF_GLOSSY)) && 0 < sysNumberOfLights)
 	{
-		LightSample lightSample; // Sample one of many lights.
+		POptix::LightSample lightSample; // Sample one of many lights.
 		lightSample.index = optix::clamp(static_cast<int>(floorf(rng(thePrd.seed) * sysNumberOfLights)), 0, sysNumberOfLights - 1);
-		LightParameter light = sysLightParameters[lightSample.index];
-		const ELightType lightType = light.lightType;
-		lightSample.distance = RT_DEFAULT_MAX;
+		POptix::Light light = sysLightParameters[lightSample.index];
+		const POptix::ELightType lightType = light.lightType;
 
 		sysLightSample[lightType](light, thePrd, lightSample); // lightSample direction and distance returned in world space!
 
 		if (lightSample.pdf > 0.0f) // Useful light sample?
 		{
-			float3 f = make_float3(0.0f);
+			float3 feval = make_float3(0.0f);
 			float pdf = 0.0f;
 
-			if (thePrd.brdf_flags & BSDF_DIFFUSE) 
+			if (thePrd.brdf_flags & POptix::BSDF_DIFFUSE)
 			{
 				// Diffuse evaluation
 				// Evaluate the Lambert BSDF in the light sample direction. Normally cheaper than shooting rays.
-				sysBRDFPdf[EBrdfTypes::LAMBERT](mat, state, thePrd);
-				f = sysBRDFEval[EBrdfTypes::LAMBERT](mat, state, thePrd);
+				sysBRDFPdf[POptix::EBrdfTypes::LAMBERT](mat, state, thePrd);
+				feval = sysBRDFEval[POptix::EBrdfTypes::LAMBERT](mat, state, thePrd);
 				pdf = thePrd.pdf;
 			}
-			else if (thePrd.brdf_flags & BSDF_GLOSSY) 
+			else if (thePrd.brdf_flags & POptix::BSDF_GLOSSY)
 			{
 				// Specular evaluation
-				sysBRDFPdf[EBrdfTypes::MICROFACET_REFLECTION](mat, state, thePrd);
-				f = sysBRDFEval[EBrdfTypes::MICROFACET_REFLECTION](mat, state, thePrd);
+				sysBRDFPdf[POptix::EBrdfTypes::MICROFACET_REFLECTION](mat, state, thePrd);
+				feval = sysBRDFEval[POptix::EBrdfTypes::MICROFACET_REFLECTION](mat, state, thePrd);
 				pdf = thePrd.pdf;
 			}
 
-			if (0.0f < pdf && isNotNull(f))
+			if (0.0f < pdf && isNotNull(feval))
 			{
 				// Do the visibility check of the light sample.
 				ShadowPRD prdShadow;
@@ -181,7 +178,7 @@ RT_PROGRAM void closesthit()
 				if (prdShadow.visible)
 				{
 					const float misWeight = powerHeuristic(lightSample.pdf, pdf);
-					thePrd.radiance += f * lightSample.emission * (misWeight * optix::dot(lightSample.direction, shading_normal) / lightSample.pdf);
+					thePrd.radiance += feval * lightSample.emission * (misWeight * fabsf(optix::dot(lightSample.direction, shading_normal)) / lightSample.pdf);
 				}
 			}
 		}
