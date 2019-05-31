@@ -1,7 +1,29 @@
 #include "inc/Scene.h"
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
+
+#include <iostream>
+
 namespace POptix
 {
+	static std::string getFileName(const std::string& s) 
+	{
+		char sep = '/';
+
+#ifdef _WIN32
+		sep = '\\';
+#endif
+
+		size_t i = s.rfind(sep, s.length());
+		if (i != std::string::npos)
+		{
+			return(s.substr(i + 1, s.length() - i));
+		}
+
+		return("");
+	}
+
 	Scene::Scene()
 	{
 		build();
@@ -10,12 +32,15 @@ namespace POptix
 	{
 		for each (Node* node in mNodeList)
 		{
-			for each (Mesh* mesh in node->mMeshList)
-			{
-				delete mesh;
-			}
 			delete node;
 		}
+
+		std::map<unsigned int, POptix::Mesh*>::iterator it;
+		for (it = mMeshList.begin(); it != mMeshList.end(); ++it) 
+		{
+			delete it->second;
+		}
+		mMeshList.clear();
 
 		for each (Light* light in mLightList)
 		{
@@ -38,6 +63,7 @@ namespace POptix
 
 		// Make mesh
 		Mesh* planeMesh = Scene::createPlane(1, 1, 1);
+		mMeshList.insert(make_pair(0, planeMesh));
 		float tranOfPlane[16] =
 		{
 		  10.0f, 0.0f, 0.0f, /*tx*/0.0f,
@@ -47,8 +73,8 @@ namespace POptix
 		};
 
 		Node* planeNode = new Node();
-		planeNode->mMeshList.emplace_back(planeMesh);
-		planeNode->name = "Sphere Mesh";
+		planeNode->mMeshIDList.emplace_back(0);
+		planeNode->name = "Plane Mesh";
 		planeNode->materialID = 2;
 		for (int i = 0; i < 16; i++)
 			planeNode->transform[i] = tranOfPlane[i];
@@ -64,7 +90,7 @@ namespace POptix
 		const float radius = 2.0f;
 		const float maxTheta = M_PIf;
 		Mesh* sphereMesh = Scene::createSphere(tessU, tessV, radius, maxTheta);
-
+		mMeshList.insert(make_pair(1, sphereMesh));
 		float tranOfSphere[16] =
 		{
 		  1.0f, 0.0f, 0.0f, /*tx*/0.0f,
@@ -74,7 +100,7 @@ namespace POptix
 		};
 
 		Node* sphereNode = new Node();
-		sphereNode->mMeshList.emplace_back(sphereMesh);
+		sphereNode->mMeshIDList.emplace_back(1);
 		sphereNode->name = "Sphere Mesh";
 		sphereNode->materialID = 0;
 		for(int i = 0; i < 16; i++)
@@ -88,7 +114,7 @@ namespace POptix
 		const float innerRadius = 3.0f;
 		const float outerRadius = 1.0f;
 		Mesh* torusMesh = Scene::createTorus(tessU, tessV, innerRadius, outerRadius);
-		
+		mMeshList.insert(make_pair(2, torusMesh));
 		float tranOfTorus[16] =
 		{
 		  1.0f, 0.0f, 0.0f, /*tx*/0.0f,
@@ -98,7 +124,7 @@ namespace POptix
 		};
 
 		Node* torusNode = new Node();
-		torusNode->mMeshList.emplace_back(torusMesh);
+		torusNode->mMeshIDList.emplace_back(2);
 		torusNode->name = "Torus Mesh";
 		torusNode->materialID = 1;
 		for (int i = 0; i < 16; i++)
@@ -139,7 +165,267 @@ namespace POptix
 		mCamera = new PinholeCamera();
 	}
 
-	void Scene::LoadScene(std::string sceneFilePath)
+	static const int kMaxLineLength = 2048;
+	Scene* Scene::LoadScene(const char* sceneFilePath)
 	{
+		Scene *scene = new Scene;
+
+		FILE* file = fopen(sceneFilePath, "r");
+
+		if (!file)
+		{
+			printf("Couldn't open %s for reading.", sceneFilePath);
+			return nullptr;
+		}
+
+		char line[kMaxLineLength];
+		while (fgets(line, kMaxLineLength, file)) 
+		{
+			// skip comments
+			if (line[0] == '#')
+				continue;
+
+			// name used for materials and meshes
+			char name[kMaxLineLength] = { 0 };
+
+			//------------------------------------------//
+			//				Material					//
+			//------------------------------------------//
+			if (sscanf(line, " material %s", name) == 1)
+			{
+				printf("%s", line);
+
+				Material* material = new Material;
+				while (fgets(line, kMaxLineLength, file))
+				{
+					// end group
+					if (strchr(line, '}'))
+						break;
+
+					sscanf(line, " name %s", name);
+					sscanf(line, " color %f %f %f", &material->albedo.x, &material->albedo.y, &material->albedo.z);
+					sscanf(line, " metallic %f",  &material->metallic);
+					sscanf(line, " roughness %f", &material->roughness);
+				}
+
+				scene->mMaterialList.emplace_back(material);
+			}
+
+			//------------------------------------------//
+			//				Light						//
+			//------------------------------------------//
+			if (strstr(line, "light"))
+			{
+				Light* light = new Light;
+				optix::float3 v1, v2;
+				char light_type[20] = "None";
+
+				while (fgets(line, kMaxLineLength, file))
+				{
+					// end group
+					if (strchr(line, '}'))
+						break;
+
+					sscanf(line, " position %f %f %f", &light->position.x, &light->position.y, &light->position.z);
+					sscanf(line, " emission %f %f %f", &light->emission.x, &light->emission.y, &light->emission.z);
+					sscanf(line, " direction %f %f %f", &light->direction.x, &light->direction.y, &light->direction.z);
+
+					sscanf(line, " radius %f", &light->radius);
+					sscanf(line, " u %f %f %f", &light->u.x, &light->u.y, &light->u.z);
+					sscanf(line, " v %f %f %f", &light->v.x, &light->v.y, &light->v.z);
+					sscanf(line, " type %s", light_type);
+				}
+
+				if (strcmp(light_type, "Quad") == 0)
+				{
+					light->lightType = QUAD;
+					light->u = v1 - light->position;
+					light->v = v2 - light->position;
+					light->area = optix::length(optix::cross(light->u, light->v));
+					light->direction = optix::normalize(optix::cross(light->u, light->v));
+				}
+				else if (strcmp(light_type, "Sphere") == 0)
+				{
+					light->lightType = SPHERE;
+					light->direction = optix::normalize(light->direction);
+					light->area = 4.0f * M_PIf * light->radius * light->radius;
+				}
+				else if (strcmp(light_type, "Directional") == 0)
+				{
+					light->lightType = DIRECTIONAL;
+					light->direction = optix::normalize(light->direction);
+				}
+				else if (strcmp(light_type, "Environment") == 0)
+				{
+					//light.lightType = ENVIRONMENT;
+				}
+
+				scene->mLightList.emplace_back(light);
+			}
+
+			//------------------------------------------//
+			//				Properties					//
+			//------------------------------------------//
+			Properties prop;
+			prop.width = 1280;
+			prop.height = 720;
+			prop.sceneName = getFileName(sceneFilePath);
+			scene->properties = prop;
+
+			if (strstr(line, "properties"))
+			{
+
+				while (fgets(line, kMaxLineLength, file))
+				{
+					// end group
+					if (strchr(line, '}'))
+						break;
+
+					sscanf(line, " width %i", &prop.width);
+					sscanf(line, " height %i", &prop.height);
+					sscanf(line, " name %s", &prop.sceneName);
+				}
+				scene->properties = prop;
+			}
+
+			//------------------------------------------//
+			//				Mesh						//
+			//------------------------------------------//
+			if (sscanf(line, " mesh %s", name) == 1)
+			{
+				while (fgets(line, kMaxLineLength, file))
+				{
+					// end group
+					if (strchr(line, '}'))
+						break;
+
+					sscanf(line, " name %s", name);
+					int count = 0;
+					char path[2048];
+
+					if (sscanf(line, " filepath %s", path) == 1)
+					{
+						unsigned int meshCount = scene->mMeshList.size();
+						Mesh* mesh = LoadOBJ(path);
+						mesh->name = name;
+						mesh->filePath = path;
+						mesh->ID = meshCount;
+						scene->mMeshList.insert(make_pair(meshCount, mesh));
+					}
+				}
+			}
+
+			//------------------------------------------//
+			//				Node						//
+			//------------------------------------------//
+			if (sscanf(line, " node %s", name) == 1)
+			{
+				printf("%s", line);
+
+				Node* node = new Node;
+				node->transform = new float[16];
+				while (fgets(line, kMaxLineLength, file))
+				{
+					// end group
+					if (strchr(line, '}'))
+						break;
+
+					sscanf(line, " name %s", &node->name);
+					sscanf(line, " materialID %d", &node->materialID);
+					sscanf(line, " transform %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f", 
+						&node->transform[ 0], &node->transform[ 1], &node->transform[ 2], &node->transform[ 3], 
+						&node->transform[ 4], &node->transform[ 5], &node->transform[ 6], &node->transform[ 7], 
+						&node->transform[ 8], &node->transform[ 9], &node->transform[10], &node->transform[11], 
+						&node->transform[11], &node->transform[13], &node->transform[14], &node->transform[15]);
+
+					// TODO real all the mesh ID 
+					/*while (fgets(line, kMaxLineLength, file)) 
+					{
+					}*/
+					unsigned int val;
+					sscanf(line, " meshID %d", &val);
+					node->mMeshIDList.push_back(val);
+				}
+				scene->mNodeList.emplace_back(node);
+			}
+		}
+
+		return scene;
+	}
+
+
+	Mesh* Scene::LoadOBJ(std::string inputfile)
+	{
+		Mesh* mesh = new Mesh;
+
+		tinyobj::attrib_t attrib;
+		std::vector<tinyobj::shape_t> shapes;
+		std::vector<tinyobj::material_t> materials;
+
+		std::string err;
+		bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, inputfile.c_str());
+
+		if (!err.empty() && err[0] != 'W') { // `err` may contain warning message.
+			std::cerr << err << std::endl;
+		}
+
+		if (!ret)
+			exit(1);
+
+
+		// Loop over shapes
+		size_t numOfIndicesInShape = 0;
+		for (auto& shape : shapes)
+		{
+			// Loop over faces(polygon)
+			size_t index_offset = 0;
+			for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++)
+			{
+				int fv = shape.mesh.num_face_vertices[f];
+
+				// Loop over vertices in the face.
+				for (size_t v = 0; v < fv; v++)
+				{
+					// access to vertex
+					tinyobj::index_t idx = shape.mesh.indices[index_offset + v];
+					VertexAttributes singleVertexData;
+
+					tinyobj::real_t vx = attrib.vertices[3 * idx.vertex_index + 0];
+					tinyobj::real_t vy = attrib.vertices[3 * idx.vertex_index + 1];
+					tinyobj::real_t vz = attrib.vertices[3 * idx.vertex_index + 2];
+					tinyobj::real_t nx = attrib.normals[3 * idx.normal_index + 0];
+					tinyobj::real_t ny = attrib.normals[3 * idx.normal_index + 1];
+					tinyobj::real_t nz = attrib.normals[3 * idx.normal_index + 2];
+
+					tinyobj::real_t tx = 0.0f;
+					tinyobj::real_t ty = 1.0f;
+					if (idx.texcoord_index != -1)
+					{
+						tx = attrib.texcoords[2 * idx.texcoord_index + 0];
+						ty = attrib.texcoords[2 * idx.texcoord_index + 1];
+					}
+
+					singleVertexData.vertex = optix::make_float3(vx, vy, vz);
+					singleVertexData.normal = optix::make_float3(nx, ny, nz);
+					singleVertexData.texcoord = optix::make_float3(tx, ty, 0.0f);
+
+					mesh->attributes.push_back(singleVertexData);
+					mesh->indices.push_back((unsigned int)(numOfIndicesInShape + index_offset + v));
+
+					// Optional: vertex colors
+					// tinyobj::real_t red = attrib.colors[3*idx.vertex_index+0];
+					// tinyobj::real_t green = attrib.colors[3*idx.vertex_index+1];
+					// tinyobj::real_t blue = attrib.colors[3*idx.vertex_index+2];
+				}
+				index_offset += fv;
+
+				// per-face material
+				shape.mesh.material_ids[f];
+			}
+			numOfIndicesInShape += index_offset;
+		}
+
+		std::cout << "LoadOBJ(" << getFileName(inputfile) << "): Vertices = " << mesh->attributes.size() << ", Triangles = " << mesh->indices.size() / 3 << std::endl;
+		return mesh;
 	}
 }

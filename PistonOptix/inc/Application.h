@@ -113,7 +113,7 @@ private:
 
 	void createScene();
 
-	optix::Geometry LoadOBJ(std::string objPath);
+	//optix::Geometry LoadOBJ(std::string objPath);
 
 	void createGeometry(optix::Geometry& geometry, uint materialID, float* transform);
 	optix::Geometry createGeometry(std::vector<VertexAttributes> const& attributes, std::vector<unsigned int> const& indices);
@@ -143,6 +143,7 @@ private:
 	int   m_maxPathLength;       // Maximum path length.
 	float m_sceneEpsilonFactor;  // Factor on 1e-7 used to offset ray origins along the path to reduce self intersections. 
 
+	int   m_frameCount;
 	int   m_iterationIndex;
 
 	std::string m_builder;
@@ -215,7 +216,7 @@ private:
 	optix::Acceleration m_rootAcceleration;
 
 	// Scene Test
-	POptix::Scene scene;
+	POptix::Scene* scene;
 };
 
 #endif // APPLICATION_H

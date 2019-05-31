@@ -7,9 +7,6 @@
 #include <optixu/optixu_math_namespace.h>
 #include <optixu/optixu_matrix_namespace.h>
 
-#define TINYOBJLOADER_IMPLEMENTATION
-#include <tiny_obj_loader.h>
-
 #include <cstring>
 #include <iostream>
 #include <sstream>
@@ -32,22 +29,7 @@ static std::string ptxPath(std::string const& cuda_file)
 		std::string(SAMPLE_NAME) + std::string("_generated_") + cuda_file + std::string(".ptx");
 }
 
-static std::string getFileName(const std::string& s) {
 
-	char sep = '/';
-
-#ifdef _WIN32
-	sep = '\\';
-#endif
-
-	size_t i = s.rfind(sep, s.length());
-	if (i != std::string::npos)
-	{
-		return(s.substr(i + 1, s.length() - i));
-	}
-
-	return("");
-}
 
 Application::Application(GLFWwindow* window,
 	const int width,
@@ -62,6 +44,9 @@ Application::Application(GLFWwindow* window,
 	, m_stackSize(stackSize)
 	, m_interop(interop)
 {
+	scene = new POptix::Scene;
+	
+
 	// Setup ImGui binding.
 	ImGui::CreateContext();
 	ImGui_ImplGlfwGL2_Init(window, true);
@@ -133,7 +118,7 @@ Application::Application(GLFWwindow* window,
 	m_present = false;  // Update once per second. (The first half second shows all frames to get some initial accumulation).
 	m_presentNext = true;
 	m_presentAtSecond = 1.0;
-
+	m_frameCount = 0;
 	m_builder = std::string("Trbvh");
 
 	m_frames = 0; // Samples per pixel. 0 == render forever.
@@ -556,30 +541,7 @@ bool Application::render()
 			repaint = true; // Indicate that there is a new image.
 			m_presentNext = m_present;
 		}
-
-		const double seconds = m_timer.getTime();
-#if 1
-		// Show the accumulation of the first half second to remain interactive with "present 0" on the VCA.
-		// Not done when benchmarking to get more accurate results.
-		if (seconds < 0.5)
-		{
-			m_presentAtSecond = 1.0;
-			m_presentNext = true;
-		}
-		else
-#endif
-			if (m_presentAtSecond < seconds)
-			{
-				m_presentAtSecond = ceil(seconds);
-				const double fps = double(m_iterationIndex) / seconds;
-				std::ostringstream stream;
-				stream.precision(3); // Precision is # digits in fraction part.
-				// m_iterationIndex has already been incremented for the last rendered frame, so it is the actual frame count here.
-				stream << std::fixed << m_iterationIndex << " / " << seconds << " = " << fps << " fps";
-				std::cout << stream.str() << std::endl;
-
-				m_presentNext = true; // Present at least every second.
-			}
+		m_presentNext = true;
 	}
 	catch (optix::Exception& e)
 	{
@@ -775,8 +737,7 @@ void Application::guiWindow()
 		return;
 	}
 
-	ImGui::SetNextWindowSize(ImVec2(200, 200), ImGuiSetCond_FirstUseEver);
-
+ 	ImGui::SetNextWindowSize(ImVec2(200, 200), ImGuiSetCond_FirstUseEver);
 	ImGuiWindowFlags window_flags = 0;
 	if (!ImGui::Begin("PistonOptix", nullptr, window_flags)) // No bool flag to omit the close button.
 	{
@@ -786,6 +747,8 @@ void Application::guiWindow()
 	}
 
 	ImGui::PushItemWidth(-100); // right-aligned, keep 180 pixels for the labels.
+	sutil::displayFps(m_frameCount++);
+	sutil::displaySpp(m_iterationIndex, 2.0f, 40.0f);
 
 	if (ImGui::CollapsingHeader("System"))
 	{
@@ -954,7 +917,6 @@ void Application::guiWindow()
 	}
 
 	ImGui::PopItemWidth();
-
 	ImGui::End();
 }
 
@@ -1260,8 +1222,8 @@ void Application::updateMaterialParameters()
 void Application::updateLightParameters()
 {
 	POptix::Light* dst = static_cast<POptix::Light*>(m_bufferLightParameters->map(0, RT_BUFFER_MAP_WRITE_DISCARD));
-	for (size_t i = 0; i < scene.mLightList.size(); ++i, ++dst) {
-		POptix::Light* mat = scene.mLightList[i];
+	for (size_t i = 0; i < scene->mLightList.size(); ++i, ++dst) {
+		POptix::Light* mat = scene->mLightList[i];
 
 		dst->position	= mat->position;
 		dst->emission	= mat->emission;
@@ -1279,7 +1241,7 @@ void Application::initMaterials()
 {
 	// Setup GUI material parameters, one for each of the objects in the scene.
 
-	for each( POptix::Material* mat in scene.mMaterialList) 
+	for each( POptix::Material* mat in scene->mMaterialList)
 	{
 		MaterialParameterGUI parameters;
 		parameters.albedo = mat->albedo;
@@ -1343,7 +1305,7 @@ void Application::initMaterials()
 
 void Application::initLights()
 {
-	std::vector<POptix::Light*> m_lightsList = scene.mLightList;
+	std::vector<POptix::Light*> m_lightsList = scene->mLightList;
 
 	POptix::Light directionalLight;
 	directionalLight.emission = optix::make_float3(10.0f, 10.0f, 10.0f);
@@ -1385,12 +1347,17 @@ void Application::createScene()
 
 		m_context["sysTopObject"]->set(m_rootGroup); // This is where the rtTrace calls start the BVH traversal. (Same for radiance and shadow rays.)
 
-		for each(POptix::Node* node in scene.mNodeList) 
+		for each(POptix::Node* node in scene->mNodeList) 
 		{
-			for each(POptix::Mesh* mesh in node->mMeshList) 
+			for each(unsigned int meshID in node->mMeshIDList) 
 			{
-				optix::Geometry geo = createGeometry(mesh->attributes, mesh->indices);
-				createGeometry(geo, node->materialID, node->transform);
+				std::map<unsigned int, POptix::Mesh*>::iterator it;
+				it = scene->mMeshList.find(meshID);
+				if (it != scene->mMeshList.end()) 
+				{
+					optix::Geometry geo = createGeometry(it->second->attributes, it->second->indices);
+					createGeometry(geo, node->materialID, node->transform);
+				}
 			}
 		}
 
@@ -1464,81 +1431,7 @@ void Application::createScene()
 }
 
 
-optix::Geometry Application::LoadOBJ(std::string inputfile)
-{
-	std::vector<VertexAttributes> attributes;
-	std::vector<unsigned int> indicies;
 
-	tinyobj::attrib_t attrib;
-	std::vector<tinyobj::shape_t> shapes;
-	std::vector<tinyobj::material_t> materials;
-
-	std::string err;
-	bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, inputfile.c_str());
-
-	if (!err.empty() && err[0] != 'W') { // `err` may contain warning message.
-		std::cerr << err << std::endl;
-	}
-
-	if (!ret)
-		exit(1);
-
-
-	// Loop over shapes
-	size_t numOfIndicesInShape = 0;
-	for (auto& shape : shapes)
-	{
-		// Loop over faces(polygon)
-		size_t index_offset = 0;
-		for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++)
-		{
-			int fv = shape.mesh.num_face_vertices[f];
-
-			// Loop over vertices in the face.
-			for (size_t v = 0; v < fv; v++)
-			{
-				// access to vertex
-				tinyobj::index_t idx = shape.mesh.indices[index_offset + v];
-				VertexAttributes singleVertexData;
-
-				tinyobj::real_t vx = attrib.vertices[3 * idx.vertex_index + 0];
-				tinyobj::real_t vy = attrib.vertices[3 * idx.vertex_index + 1];
-				tinyobj::real_t vz = attrib.vertices[3 * idx.vertex_index + 2];
-				tinyobj::real_t nx = attrib.normals[3 * idx.normal_index + 0];
-				tinyobj::real_t ny = attrib.normals[3 * idx.normal_index + 1];
-				tinyobj::real_t nz = attrib.normals[3 * idx.normal_index + 2];
-
-				tinyobj::real_t tx = 0.0f;
-				tinyobj::real_t ty = 1.0f;
-				if (idx.texcoord_index != -1)
-				{
-					tx = attrib.texcoords[2 * idx.texcoord_index + 0];
-					ty = attrib.texcoords[2 * idx.texcoord_index + 1];
-				}
-
-				singleVertexData.vertex = optix::make_float3(vx, vy, vz);
-				singleVertexData.normal = optix::make_float3(nx, ny, nz);
-				singleVertexData.texcoord = optix::make_float3(tx, ty, 0.0f);
-
-				attributes.push_back(singleVertexData);
-				indicies.push_back((unsigned int)(numOfIndicesInShape + index_offset + v));
-
-				// Optional: vertex colors
-				// tinyobj::real_t red = attrib.colors[3*idx.vertex_index+0];
-				// tinyobj::real_t green = attrib.colors[3*idx.vertex_index+1];
-				// tinyobj::real_t blue = attrib.colors[3*idx.vertex_index+2];
-			}
-			index_offset += fv;
-
-			// per-face material
-			shape.mesh.material_ids[f];
-		}
-		numOfIndicesInShape += index_offset;
-	}
-
-	std::cout << "LoadOBJ(" << getFileName(inputfile) << "): Vertices = " << attributes.size() << ", Triangles = " << indicies.size() / 3 << std::endl;
-	return createGeometry(attributes, indicies);
-}
 
 void Application::setAccelerationProperties(optix::Acceleration acceleration)
 {

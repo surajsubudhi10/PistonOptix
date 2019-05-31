@@ -728,6 +728,20 @@ void sutil::displayFps( unsigned int frame_count )
     }
 }
 
+void sutil::displaySpp(unsigned int frame_count, float paddingX, float paddingY)
+{
+	ImGui::SetNextWindowPos(ImVec2(paddingX, paddingY));
+	ImGui::Begin("stats", 0,
+		ImGuiWindowFlags_NoTitleBar |
+		ImGuiWindowFlags_AlwaysAutoResize |
+		ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_NoScrollbar |
+		ImGuiWindowFlags_NoInputs
+	);
+	ImGui::Text("spp: %7i", frame_count);
+	ImGui::End();
+}
+
 
 optix::TextureSampler sutil::loadTexture( optix::Context context,
         const std::string& filename, optix::float3 default_color )
