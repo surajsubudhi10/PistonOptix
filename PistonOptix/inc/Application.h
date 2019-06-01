@@ -30,6 +30,7 @@
 #include "shaders/vertex_attributes.h"
 #include "shaders/material_parameter.h"
 #include "inc\LightParameters.h"
+#include "inc\Scene.h"
 
 #include <string>
 #include <map>
@@ -93,6 +94,7 @@ public:
 
 	static void guiReferenceManual(); // DAR HACK DEBUG The IMGUI "programming manual" in form of a live window.
 
+	
 private:
 	static void getSystemInformation();
 
@@ -111,13 +113,9 @@ private:
 
 	void createScene();
 
-	optix::Geometry createBox();
-	optix::Geometry createPlane(const int tessU, const int tessV, const int upAxis);
-	optix::Geometry createSphere(const int tessU, const int tessV, const float radius, const float maxTheta);
-	optix::Geometry createTorus(const int tessU, const int tessV, const float innerRadius, const float outerRadius);
-	optix::Geometry LoadOBJ(std::string objPath);
+	//optix::Geometry LoadOBJ(std::string objPath);
 
-	void createGeometryFromOBJ(std::string objPath, uint materialID, float* transform);
+	void createGeometry(optix::Geometry& geometry, uint materialID, float* transform);
 	optix::Geometry createGeometry(std::vector<VertexAttributes> const& attributes, std::vector<unsigned int> const& indices);
 
 	void setAccelerationProperties(optix::Acceleration acceleration);
@@ -145,6 +143,7 @@ private:
 	int   m_maxPathLength;       // Maximum path length.
 	float m_sceneEpsilonFactor;  // Factor on 1e-7 used to offset ray origins along the path to reduce self intersections. 
 
+	int   m_frameCount;
 	int   m_iterationIndex;
 
 	std::string m_builder;
@@ -174,7 +173,7 @@ private:
 	// These are converted on the fly into the device side sysMaterialParameters buffer.
 	std::vector<MaterialParameterGUI>	m_guiMaterialParameters;
 
-	std::vector<LightParameter>			m_lightsList;
+	//std::vector<POptix::Light>			m_lightsList;
 	
 	optix::Buffer						m_bufferMaterialParameters; // Array of MaterialParameters.
 	optix::Buffer						m_bufferLightParameters; // Array of LightsParameters.
@@ -215,6 +214,9 @@ private:
 	// The root node of the OptiX scene graph (sysTopObject)
 	optix::Group        m_rootGroup;
 	optix::Acceleration m_rootAcceleration;
+
+	// Scene Test
+	POptix::Scene* scene;
 };
 
 #endif // APPLICATION_H

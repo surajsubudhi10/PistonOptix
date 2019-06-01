@@ -7,9 +7,6 @@
 #include <optixu/optixu_math_namespace.h>
 #include <optixu/optixu_matrix_namespace.h>
 
-#define TINYOBJLOADER_IMPLEMENTATION
-#include <tiny_obj_loader.h>
-
 #include <cstring>
 #include <iostream>
 #include <sstream>
@@ -32,22 +29,7 @@ static std::string ptxPath(std::string const& cuda_file)
 		std::string(SAMPLE_NAME) + std::string("_generated_") + cuda_file + std::string(".ptx");
 }
 
-static std::string getFileName(const std::string& s) {
 
-	char sep = '/';
-
-#ifdef _WIN32
-	sep = '\\';
-#endif
-
-	size_t i = s.rfind(sep, s.length());
-	if (i != std::string::npos)
-	{
-		return(s.substr(i + 1, s.length() - i));
-	}
-
-	return("");
-}
 
 Application::Application(GLFWwindow* window,
 	const int width,
@@ -62,6 +44,10 @@ Application::Application(GLFWwindow* window,
 	, m_stackSize(stackSize)
 	, m_interop(interop)
 {
+	//scene = new POptix::Scene;
+	//scene->build();
+	scene = POptix::Scene::LoadScene((std::string(sutil::samplesDir()) + "\\resources\\Scenes\\TestScene.scn").c_str());
+
 	// Setup ImGui binding.
 	ImGui::CreateContext();
 	ImGui_ImplGlfwGL2_Init(window, true);
@@ -127,13 +113,13 @@ Application::Application(GLFWwindow* window,
 
 	// Renderer setup and GUI parameters.
 	m_minPathLength = 2;    // Minimum path length after which Russian Roulette path termination starts.
-	m_maxPathLength = 5;    // Maximum path length. (Need at least 6 path segments to go through a glass sphere, hit something, and back through that sphere to the viewer.)
+	m_maxPathLength = 5;    // Maximum path length. 
 	m_sceneEpsilonFactor = 500;  // Factor on 1e-7 used to offset ray origins along the path to reduce self intersections. 
 
 	m_present = false;  // Update once per second. (The first half second shows all frames to get some initial accumulation).
 	m_presentNext = true;
 	m_presentAtSecond = 1.0;
-
+	m_frameCount = 0;
 	m_builder = std::string("Trbvh");
 
 	m_frames = 0; // Samples per pixel. 0 == render forever.
@@ -144,14 +130,15 @@ Application::Application(GLFWwindow* window,
 	m_glslProgram = 0;
 
 	// Settings normally used.
-	//m_gamma          = 2.2f;
-	//m_colorBalance   = optix::make_float3(1.0f);
-	//m_whitePoint     = 1.0f;
-	//m_burnHighlights = 0.8f;
-	//m_crushBlacks    = 0.2f;
-	//m_saturation     = 1.2f;
-	//m_brightness     = 0.8f;
+	m_gamma          = 2.2f;
+	m_colorBalance   = optix::make_float3(1.0f);
+	m_whitePoint     = 1.0f;
+	m_burnHighlights = 0.8f;
+	m_crushBlacks    = 0.2f;
+	m_saturation     = 1.2f;
+	m_brightness     = 0.8f;
 
+	/*
 	// Neutral tonemapper settings.
 	// This sample begins with an Ambient Occlusion like rendering setup. Make sure the the image stays white.
 	m_gamma = 2.2f; // Neutral would be 1.0f.
@@ -161,6 +148,7 @@ Application::Application(GLFWwindow* window,
 	m_crushBlacks = 0.0f;
 	m_saturation = 1.0f;
 	m_brightness = 1.0f;
+	*/
 
 	m_guiState = GUI_STATE_NONE;
 	m_isWindowVisible = true;
@@ -554,30 +542,7 @@ bool Application::render()
 			repaint = true; // Indicate that there is a new image.
 			m_presentNext = m_present;
 		}
-
-		const double seconds = m_timer.getTime();
-#if 1
-		// Show the accumulation of the first half second to remain interactive with "present 0" on the VCA.
-		// Not done when benchmarking to get more accurate results.
-		if (seconds < 0.5)
-		{
-			m_presentAtSecond = 1.0;
-			m_presentNext = true;
-		}
-		else
-#endif
-			if (m_presentAtSecond < seconds)
-			{
-				m_presentAtSecond = ceil(seconds);
-				const double fps = double(m_iterationIndex) / seconds;
-				std::ostringstream stream;
-				stream.precision(3); // Precision is # digits in fraction part.
-				// m_iterationIndex has already been incremented for the last rendered frame, so it is the actual frame count here.
-				stream << std::fixed << m_iterationIndex << " / " << seconds << " = " << fps << " fps";
-				std::cout << stream.str() << std::endl;
-
-				m_presentNext = true; // Present at least every second.
-			}
+		m_presentNext = true;
 	}
 	catch (optix::Exception& e)
 	{
@@ -773,8 +738,7 @@ void Application::guiWindow()
 		return;
 	}
 
-	ImGui::SetNextWindowSize(ImVec2(200, 200), ImGuiSetCond_FirstUseEver);
-
+ 	ImGui::SetNextWindowSize(ImVec2(200, 200), ImGuiSetCond_FirstUseEver);
 	ImGuiWindowFlags window_flags = 0;
 	if (!ImGui::Begin("PistonOptix", nullptr, window_flags)) // No bool flag to omit the close button.
 	{
@@ -784,6 +748,8 @@ void Application::guiWindow()
 	}
 
 	ImGui::PushItemWidth(-100); // right-aligned, keep 180 pixels for the labels.
+	sutil::displayFps(m_frameCount++);
+	sutil::displaySpp(m_iterationIndex, 2.0f, 40.0f);
 
 	if (ImGui::CollapsingHeader("System"))
 	{
@@ -952,7 +918,6 @@ void Application::guiWindow()
 	}
 
 	ImGui::PopItemWidth();
-
 	ImGui::End();
 }
 
@@ -1052,11 +1017,11 @@ void Application::guiEventHandler()
 	}
 }
 
-void Application::createGeometryFromOBJ(std::string objPath, uint materialID, float * transform)
+void Application::createGeometry(optix::Geometry& geometry, uint materialID, float * transform)
 {
 	try
 	{
-		optix::Geometry geometry = LoadOBJ(objPath);
+		//optix::Geometry geometry = LoadOBJ(objPath);
 
 		optix::GeometryInstance giGeo = m_context->createGeometryInstance(); // This connects Geometries with Materials.
 		giGeo->setGeometry(geometry);
@@ -1173,38 +1138,38 @@ void Application::initBRDFPrograms()
 	{
 		Program prg;
 		// BRDF Sampling function
-		m_bufferBRDFSample = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, EBrdfTypes::NUM_OF_BRDF);
+		m_bufferBRDFSample = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, POptix::EBrdfTypes::NUM_OF_BRDF);
 		int* brdfSample = (int*)m_bufferBRDFSample->map(0, RT_BUFFER_MAP_WRITE_DISCARD);
 		prg = m_context->createProgramFromPTXFile(ptxPath("lambert.cu"), "Sample");
-		brdfSample[EBrdfTypes::LAMBERT] = prg->getId();
+		brdfSample[POptix::EBrdfTypes::LAMBERT] = prg->getId();
 		prg = m_context->createProgramFromPTXFile(ptxPath("PhongModified.cu"), "Sample");
-		brdfSample[EBrdfTypes::PHONG] = prg->getId();
+		brdfSample[POptix::EBrdfTypes::PHONG] = prg->getId();
 		prg = m_context->createProgramFromPTXFile(ptxPath("MicrofacetReflection.cu"), "Sample");
-		brdfSample[EBrdfTypes::MICROFACET_REFLECTION] = prg->getId();
+		brdfSample[POptix::EBrdfTypes::MICROFACET_REFLECTION] = prg->getId();
 		m_bufferBRDFSample->unmap();
 		m_context["sysBRDFSample"]->setBuffer(m_bufferBRDFSample);
 
 		// BRDF Eval function
-		m_bufferBRDFEval = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, EBrdfTypes::NUM_OF_BRDF);
+		m_bufferBRDFEval = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, POptix::EBrdfTypes::NUM_OF_BRDF);
 		int* brdfEval = (int*)m_bufferBRDFEval->map(0, RT_BUFFER_MAP_WRITE_DISCARD);
 		prg = m_context->createProgramFromPTXFile(ptxPath("lambert.cu"), "Eval");
-		brdfEval[EBrdfTypes::LAMBERT] = prg->getId();
+		brdfEval[POptix::EBrdfTypes::LAMBERT] = prg->getId();
 		prg = m_context->createProgramFromPTXFile(ptxPath("PhongModified.cu"), "Eval");
-		brdfEval[EBrdfTypes::PHONG] = prg->getId();
+		brdfEval[POptix::EBrdfTypes::PHONG] = prg->getId();
 		prg = m_context->createProgramFromPTXFile(ptxPath("MicrofacetReflection.cu"), "Eval");
-		brdfEval[EBrdfTypes::MICROFACET_REFLECTION] = prg->getId();
+		brdfEval[POptix::EBrdfTypes::MICROFACET_REFLECTION] = prg->getId();
 		m_bufferBRDFEval->unmap();
 		m_context["sysBRDFEval"]->setBuffer(m_bufferBRDFEval);
 
 		// BRDF PDF function
-		m_bufferBRDFPdf = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, EBrdfTypes::NUM_OF_BRDF);
+		m_bufferBRDFPdf = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, POptix::EBrdfTypes::NUM_OF_BRDF);
 		int* brdfPDF = (int*)m_bufferBRDFPdf->map(0, RT_BUFFER_MAP_WRITE_DISCARD);
 		prg = m_context->createProgramFromPTXFile(ptxPath("lambert.cu"), "PDF");
-		brdfPDF[EBrdfTypes::LAMBERT] = prg->getId();
+		brdfPDF[POptix::EBrdfTypes::LAMBERT] = prg->getId();
 		prg = m_context->createProgramFromPTXFile(ptxPath("PhongModified.cu"), "PDF");
-		brdfPDF[EBrdfTypes::PHONG] = prg->getId();
+		brdfPDF[POptix::EBrdfTypes::PHONG] = prg->getId();
 		prg = m_context->createProgramFromPTXFile(ptxPath("MicrofacetReflection.cu"), "PDF");
-		brdfPDF[EBrdfTypes::MICROFACET_REFLECTION] = prg->getId();
+		brdfPDF[POptix::EBrdfTypes::MICROFACET_REFLECTION] = prg->getId();
 		m_bufferBRDFPdf->unmap();
 		m_context["sysBRDFPdf"]->setBuffer(m_bufferBRDFPdf);
 	}
@@ -1220,14 +1185,14 @@ void Application::initLightProgrames()
 	{
 		Program prg;
 		// Light sampling functions.
-		m_bufferLightSample = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, ELightType::NUM_OF_LIGHT_TYPE);
+		m_bufferLightSample = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_PROGRAM_ID, POptix::ELightType::NUM_OF_LIGHT_TYPE);
 		int* lightsample = (int*)m_bufferLightSample->map(0, RT_BUFFER_MAP_WRITE_DISCARD);
 		prg = m_context->createProgramFromPTXFile(ptxPath("LightSample.cu"), "sphere_sample");
-		lightsample[ELightType::SPHERE] = prg->getId();
+		lightsample[POptix::ELightType::SPHERE] = prg->getId();
 		prg = m_context->createProgramFromPTXFile(ptxPath("LightSample.cu"), "quad_sample");
-		lightsample[ELightType::QUAD] = prg->getId();
+		lightsample[POptix::ELightType::QUAD] = prg->getId();
 		prg = m_context->createProgramFromPTXFile(ptxPath("LightSample.cu"), "directional_sample");
-		lightsample[ELightType::DIRECTIONAL] = prg->getId();
+		lightsample[POptix::ELightType::DIRECTIONAL] = prg->getId();
 		m_bufferLightSample->unmap();
 		m_context["sysLightSample"]->setBuffer(m_bufferLightSample);
 	}
@@ -1241,7 +1206,7 @@ void Application::updateMaterialParameters()
 {
 	// Convert the GUI material parameters to the device side structure and upload them into the context global buffer.
 	// (Doing this in a loop will make more sense in later examples.)
-	MaterialParameter* dst = static_cast<MaterialParameter*>(m_bufferMaterialParameters->map(0, RT_BUFFER_MAP_WRITE_DISCARD));
+	POptix::Material* dst = static_cast<POptix::Material*>(m_bufferMaterialParameters->map(0, RT_BUFFER_MAP_WRITE_DISCARD));
 
 	for (size_t i = 0; i < m_guiMaterialParameters.size(); ++i, ++dst)
 	{
@@ -1257,18 +1222,18 @@ void Application::updateMaterialParameters()
 
 void Application::updateLightParameters()
 {
-	LightParameter* dst = static_cast<LightParameter*>(m_bufferLightParameters->map(0, RT_BUFFER_MAP_WRITE_DISCARD));
-	for (size_t i = 0; i < m_lightsList.size(); ++i, ++dst) {
-		LightParameter mat = m_lightsList[i];
+	POptix::Light* dst = static_cast<POptix::Light*>(m_bufferLightParameters->map(0, RT_BUFFER_MAP_WRITE_DISCARD));
+	for (size_t i = 0; i < scene->mLightList.size(); ++i, ++dst) {
+		POptix::Light* mat = scene->mLightList[i];
 
-		dst->position = mat.position;
-		dst->emission = mat.emission;
-		dst->radius = mat.radius;
-		dst->area = mat.area;
-		dst->u = mat.u;
-		dst->v = mat.v;
-		dst->direction = mat.direction;
-		dst->lightType = mat.lightType;
+		dst->position	= mat->position;
+		dst->emission	= mat->emission;
+		dst->radius		= mat->radius;
+		dst->area		= mat->area;
+		dst->u			= mat->u;
+		dst->v			= mat->v;
+		dst->direction	= mat->direction;
+		dst->lightType	= mat->lightType;
 	}
 	m_bufferLightParameters->unmap();
 }
@@ -1276,8 +1241,16 @@ void Application::updateLightParameters()
 void Application::initMaterials()
 {
 	// Setup GUI material parameters, one for each of the objects in the scene.
-	MaterialParameterGUI parameters;
 
+	for each( POptix::Material* mat in scene->mMaterialList)
+	{
+		MaterialParameterGUI parameters;
+		parameters.albedo = mat->albedo;
+		parameters.roughness = mat->roughness;
+		parameters.metallic = mat->metallic;
+		m_guiMaterialParameters.push_back(parameters);
+	}
+	/*
 	// Make all parameters white to show automatic ambient occlusion with a brute force full global illumination path tracer.
 	parameters.albedo = optix::make_float3(0.6f);
 	parameters.roughness = 1.0f;
@@ -1298,11 +1271,12 @@ void Application::initMaterials()
 	parameters.roughness = 1.0f;
 	parameters.metallic = 0.0f;
 	m_guiMaterialParameters.push_back(parameters); // 3, torus
+	*/
 
 	try
 	{
 		m_bufferMaterialParameters = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_USER);
-		m_bufferMaterialParameters->setElementSize(sizeof(MaterialParameter));
+		m_bufferMaterialParameters->setElementSize(sizeof(POptix::Material));
 		m_bufferMaterialParameters->setSize(m_guiMaterialParameters.size()); // As many as there are in the GUI.
 
 		updateMaterialParameters();
@@ -1332,16 +1306,12 @@ void Application::initMaterials()
 
 void Application::initLights()
 {
-	LightParameter directionalLight;
-	directionalLight.emission = optix::make_float3(10.0f, 10.0f, 10.0f);
-	directionalLight.lightType = ELightType::DIRECTIONAL;
-	directionalLight.direction = optix::normalize(optix::make_float3(-1.0f, 1.0f, 1.0f));
-	m_lightsList.push_back(directionalLight);
+	std::vector<POptix::Light*> m_lightsList = scene->mLightList;
 
 	try
 	{
 		m_bufferLightParameters = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_USER);
-		m_bufferLightParameters->setElementSize(sizeof(LightParameter));
+		m_bufferLightParameters->setElementSize(sizeof(POptix::Light));
 		m_bufferLightParameters->setSize(m_lightsList.size());
 
 		updateLightParameters();
@@ -1362,7 +1332,6 @@ void Application::createScene()
 	initMaterials();
 	initLights();
 	
-
 	try
 	{
 		// OptiX Scene Graph construction.
@@ -1373,63 +1342,19 @@ void Application::createScene()
 
 		m_context["sysTopObject"]->set(m_rootGroup); // This is where the rtTrace calls start the BVH traversal. (Same for radiance and shadow rays.)
 
-		unsigned int count;
-
-		// Demo code only!
-		// Mind that these local OptiX objects will leak when not cleaning up the scene properly on changes.
-		// Destroying the OptiX context will clean them up at program exit though.
-
-		// Add a ground plane on the xz-plane at y = 0.0f.
-		optix::Geometry geoPlane = createPlane(1, 1, 1);
-
-		optix::GeometryInstance giPlane = m_context->createGeometryInstance(); // This connects Geometries with Materials.
-		giPlane->setGeometry(geoPlane);
-		giPlane->setMaterialCount(1);
-		giPlane->setMaterial(0, m_opaqueMaterial);
-		giPlane["parMaterialIndex"]->setInt(0); // This is all! This defines which material parameters in sysMaterialParametrers to use.
-
-		optix::Acceleration accPlane = m_context->createAcceleration(m_builder);
-		setAccelerationProperties(accPlane);
-
-		optix::GeometryGroup ggPlane = m_context->createGeometryGroup(); // This connects GeometryInstances with Acceleration structures. (All OptiX nodes with "Group" in the name hold an Acceleration.)
-		ggPlane->setAcceleration(accPlane);
-		ggPlane->setChildCount(1);
-		ggPlane->setChild(0, giPlane);
-
-		// Scale the plane to go from -8 to 8.
-		float trafoPlane[16] =
+		for each(POptix::Node* node in scene->mNodeList) 
 		{
-		  18.0f, 0.0f, 0.0f, 0.0f,
-		  0.0f, 18.0f, 0.0f, 0.0f,
-		  0.0f, 0.0f, 18.0f, 0.0f,
-		  0.0f, 0.0f, 0.0f, 1.0f
-		};
-		optix::Matrix4x4 matrixPlane(trafoPlane);
-
-		optix::Transform trPlane = m_context->createTransform();
-		trPlane->setChild(ggPlane);
-		trPlane->setMatrix(false, matrixPlane.getData(), matrixPlane.inverse().getData());
-
-		count = m_rootGroup->getChildCount();
-		m_rootGroup->setChildCount(count + 1);
-		m_rootGroup->setChild(count, trPlane);
-
-		float trafoOBJ[16] =
-		{
-		  1.0f, 0.0f, 0.0f, /*tx*/0.0f,
-		  0.0f, 1.0f, 0.0f, /*ty*/0.0f,
-		  0.0f, 0.0f, 1.0f, /*tz*/3.0f,
-		  0.0f, 0.0f, 0.0f, 1.0f
-		};
-
-		const std::string objMatFilepath = std::string(sutil::samplesDir()) +
-			R"(\resources\Models\OBJFiles\ShaderBall\BallMainCentMatL1.obj)";
-		const std::string objStandFilepath = std::string(sutil::samplesDir()) +
-			R"(\resources\Models\OBJFiles\ShaderBall\BallStandCentMatL1.obj)";
-
-		createGeometryFromOBJ(objMatFilepath, 2, trafoOBJ);
-		createGeometryFromOBJ(objStandFilepath, 1, trafoOBJ);
-
+			for each(unsigned int meshID in node->mMeshIDList) 
+			{
+				std::map<unsigned int, POptix::Mesh*>::iterator it;
+				it = scene->mMeshList.find(meshID);
+				if (it != scene->mMeshList.end()) 
+				{
+					optix::Geometry geo = createGeometry(it->second->attributes, it->second->indices);
+					createGeometry(geo, node->materialID, node->transform);
+				}
+			}
+		}
 	}
 	catch (optix::Exception& e)
 	{
@@ -1438,81 +1363,7 @@ void Application::createScene()
 }
 
 
-optix::Geometry Application::LoadOBJ(std::string inputfile)
-{
-	std::vector<VertexAttributes> attributes;
-	std::vector<unsigned int> indicies;
 
-	tinyobj::attrib_t attrib;
-	std::vector<tinyobj::shape_t> shapes;
-	std::vector<tinyobj::material_t> materials;
-
-	std::string err;
-	bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, inputfile.c_str());
-
-	if (!err.empty() && err[0] != 'W') { // `err` may contain warning message.
-		std::cerr << err << std::endl;
-	}
-
-	if (!ret)
-		exit(1);
-
-
-	// Loop over shapes
-	size_t numOfIndicesInShape = 0;
-	for (auto& shape : shapes)
-	{
-		// Loop over faces(polygon)
-		size_t index_offset = 0;
-		for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++)
-		{
-			int fv = shape.mesh.num_face_vertices[f];
-
-			// Loop over vertices in the face.
-			for (size_t v = 0; v < fv; v++)
-			{
-				// access to vertex
-				tinyobj::index_t idx = shape.mesh.indices[index_offset + v];
-				VertexAttributes singleVertexData;
-
-				tinyobj::real_t vx = attrib.vertices[3 * idx.vertex_index + 0];
-				tinyobj::real_t vy = attrib.vertices[3 * idx.vertex_index + 1];
-				tinyobj::real_t vz = attrib.vertices[3 * idx.vertex_index + 2];
-				tinyobj::real_t nx = attrib.normals[3 * idx.normal_index + 0];
-				tinyobj::real_t ny = attrib.normals[3 * idx.normal_index + 1];
-				tinyobj::real_t nz = attrib.normals[3 * idx.normal_index + 2];
-
-				tinyobj::real_t tx = 0.0f;
-				tinyobj::real_t ty = 1.0f;
-				if (idx.texcoord_index != -1)
-				{
-					tx = attrib.texcoords[2 * idx.texcoord_index + 0];
-					ty = attrib.texcoords[2 * idx.texcoord_index + 1];
-				}
-
-				singleVertexData.vertex = optix::make_float3(vx, vy, vz);
-				singleVertexData.normal = optix::make_float3(nx, ny, nz);
-				singleVertexData.texcoord = optix::make_float3(tx, ty, 0.0f);
-
-				attributes.push_back(singleVertexData);
-				indicies.push_back((unsigned int)(numOfIndicesInShape + index_offset + v));
-
-				// Optional: vertex colors
-				// tinyobj::real_t red = attrib.colors[3*idx.vertex_index+0];
-				// tinyobj::real_t green = attrib.colors[3*idx.vertex_index+1];
-				// tinyobj::real_t blue = attrib.colors[3*idx.vertex_index+2];
-			}
-			index_offset += fv;
-
-			// per-face material
-			shape.mesh.material_ids[f];
-		}
-		numOfIndicesInShape += index_offset;
-	}
-
-	std::cout << "LoadOBJ(" << getFileName(inputfile) << "): Vertices = " << attributes.size() << ", Triangles = " << indicies.size() / 3 << std::endl;
-	return createGeometry(attributes, indicies);
-}
 
 void Application::setAccelerationProperties(optix::Acceleration acceleration)
 {

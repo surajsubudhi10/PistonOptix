@@ -1,0 +1,33 @@
+properties
+{
+	width 800
+	height 800
+}
+
+material name<string>
+{
+	color <float[3]>
+	metallic <float>
+	roughness <float>
+}
+
+mesh name<string>
+{
+	filepath <string>
+	#meshID <int>
+}
+
+node name <string>
+{
+	materialID <int>
+	transform  <int[16]>
+	meshID <vector>
+}
+
+light
+{
+	type Distant
+	emission 1 1 1
+	normal 1.0 1.0 1.0
+}
+

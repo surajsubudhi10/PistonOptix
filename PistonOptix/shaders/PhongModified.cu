@@ -6,7 +6,7 @@
 
 rtDeclareVariable(Ray, theRay, rtCurrentRay, );
 
-RT_CALLABLE_PROGRAM void PDF(MaterialParameter &mat, State &state, PerRayData &prd)
+RT_CALLABLE_PROGRAM void PDF(POptix::Material &mat, State &state, PerRayData &prd)
 {
 	float3 N = state.shading_normal;					// In World Coordinate
 	float3 woWorld = -theRay.direction;					// In World Coordinate (viewer direction)
@@ -19,7 +19,7 @@ RT_CALLABLE_PROGRAM void PDF(MaterialParameter &mat, State &state, PerRayData &p
 	prd.pdf = sameHemisphere ? satu(powf(fabsf(cosTheta), alpha)) * M_2_PIf * (alpha + 1.0f) : 0.0f;			// Importance Sampling
 }
 
-RT_CALLABLE_PROGRAM void Sample(MaterialParameter &mat, State &state, PerRayData &prd)
+RT_CALLABLE_PROGRAM void Sample(POptix::Material &mat, State &state, PerRayData &prd)
 {
 	float3 N = state.shading_normal;					// In World Coordinate
 	float3 woWorld = -theRay.direction;					// In World Coordinate (viewer direction)
@@ -35,7 +35,7 @@ RT_CALLABLE_PROGRAM void Sample(MaterialParameter &mat, State &state, PerRayData
 }
 
 
-RT_CALLABLE_PROGRAM float3 Eval(MaterialParameter &mat, State &state, PerRayData &prd)
+RT_CALLABLE_PROGRAM float3 Eval(POptix::Material &mat, State &state, PerRayData &prd)
 {
 	float3 N = state.shading_normal;					// In World Coordinate
 	float3 woWorld = -theRay.direction;					// In World Coordinate (viewer direction)

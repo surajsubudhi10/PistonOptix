@@ -14,6 +14,9 @@ OPTIX_add_sample_executable( PistonOptix
 
   inc/Timer.h
   src/Timer.cpp
+  
+  inc/Scene.h
+  src/Scene.cpp
 
   inc/LightParameters.h
   

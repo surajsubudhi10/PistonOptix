@@ -143,6 +143,11 @@ void SUTILAPI displayBufferGL(
 void SUTILAPI displayFps(
         unsigned total_frame_count );    // total frame count
 
+// Display spp time, where the OpenGL context
+// is managed by the caller.
+void SUTILAPI displaySpp(
+	unsigned total_frame_count, float paddingX, float paddingY);    // total frame count
+
 // Create on OptiX TextureSampler for the given image file.  If the filename is
 // empty or if loading the file fails, return 1x1 texture with default color.
 optix::TextureSampler SUTILAPI loadTexture(

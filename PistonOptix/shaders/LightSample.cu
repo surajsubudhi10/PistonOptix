@@ -23,7 +23,7 @@ RT_FUNCTION float3 UniformSampleSphere(float u1, float u2)
 	return make_float3(x, y, z);
 }
 
-RT_CALLABLE_PROGRAM void sphere_sample(LightParameter &light, PerRayData &prd, LightSample &sample)
+RT_CALLABLE_PROGRAM void sphere_sample(POptix::Light &light, PerRayData &prd, POptix::LightSample &sample)
 {
 	const float r1 = rng(prd.seed);
 	const float r2 = rng(prd.seed);
@@ -33,7 +33,7 @@ RT_CALLABLE_PROGRAM void sphere_sample(LightParameter &light, PerRayData &prd, L
 	sample.pdf = -1.0f;
 }
 
-RT_CALLABLE_PROGRAM void quad_sample(LightParameter &light, PerRayData &prd, LightSample &sample)
+RT_CALLABLE_PROGRAM void quad_sample(POptix::Light &light, PerRayData &prd, POptix::LightSample &sample)
 {
 	const float r1 = rng(prd.seed);
 	const float r2 = rng(prd.seed);
@@ -43,9 +43,10 @@ RT_CALLABLE_PROGRAM void quad_sample(LightParameter &light, PerRayData &prd, Lig
 	sample.pdf = -1.0f;
 }
 
-RT_CALLABLE_PROGRAM void directional_sample(LightParameter &light, PerRayData &prd, LightSample &sample)
+RT_CALLABLE_PROGRAM void directional_sample(POptix::Light &light, PerRayData &prd, POptix::LightSample &sample)
 {
 	sample.direction = light.direction;
+	sample.distance = RT_DEFAULT_MAX;
 	sample.emission = light.emission * sysNumberOfLights;
 	sample.pdf = 1.0f;
 }
