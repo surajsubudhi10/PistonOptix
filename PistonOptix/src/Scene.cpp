@@ -4,6 +4,7 @@
 #include <tiny_obj_loader.h>
 
 #include <iostream>
+#include <sutil.h>
 
 namespace POptix
 {
@@ -26,7 +27,7 @@ namespace POptix
 
 	Scene::Scene()
 	{
-		build();
+		//build();
 	}
 	Scene::~Scene()
 	{
@@ -217,6 +218,11 @@ namespace POptix
 			if (strstr(line, "light"))
 			{
 				Light* light = new Light;
+				light->position = make_float3(0.0f);
+				light->radius = 1.0f;
+				light->u = make_float3(1.0f, 0.0f, 0.0f);
+				light->v = make_float3(0.0f, 0.0f, 1.0f);
+
 				optix::float3 v1, v2;
 				char light_type[20] = "None";
 
@@ -306,7 +312,7 @@ namespace POptix
 					if (sscanf(line, " filepath %s", path) == 1)
 					{
 						unsigned int meshCount = scene->mMeshList.size();
-						Mesh* mesh = LoadOBJ(path);
+						Mesh* mesh = LoadOBJ((std::string(sutil::samplesDir()) + "\\resources\\" + std::string(path)));
 						mesh->name = name;
 						mesh->filePath = path;
 						mesh->ID = meshCount;
@@ -324,27 +330,27 @@ namespace POptix
 
 				Node* node = new Node;
 				node->transform = new float[16];
+				node->name = name;
 				while (fgets(line, kMaxLineLength, file))
 				{
 					// end group
 					if (strchr(line, '}'))
 						break;
 
-					sscanf(line, " name %s", &node->name);
 					sscanf(line, " materialID %d", &node->materialID);
 					sscanf(line, " transform %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f", 
 						&node->transform[ 0], &node->transform[ 1], &node->transform[ 2], &node->transform[ 3], 
 						&node->transform[ 4], &node->transform[ 5], &node->transform[ 6], &node->transform[ 7], 
 						&node->transform[ 8], &node->transform[ 9], &node->transform[10], &node->transform[11], 
-						&node->transform[11], &node->transform[13], &node->transform[14], &node->transform[15]);
+						&node->transform[12], &node->transform[13], &node->transform[14], &node->transform[15]);
 
 					// TODO real all the mesh ID 
 					/*while (fgets(line, kMaxLineLength, file)) 
 					{
 					}*/
-					unsigned int val;
-					sscanf(line, " meshID %d", &val);
-					node->mMeshIDList.push_back(val);
+					unsigned int val = 0;
+					if(sscanf(line, " meshID %d", &val))
+						node->mMeshIDList.push_back(val);
 				}
 				scene->mNodeList.emplace_back(node);
 			}

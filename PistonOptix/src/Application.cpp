@@ -44,8 +44,9 @@ Application::Application(GLFWwindow* window,
 	, m_stackSize(stackSize)
 	, m_interop(interop)
 {
-	scene = new POptix::Scene;
-	
+	//scene = new POptix::Scene;
+	//scene->build();
+	scene = POptix::Scene::LoadScene((std::string(sutil::samplesDir()) + "\\resources\\Scenes\\TestScene.scn").c_str());
 
 	// Setup ImGui binding.
 	ImGui::CreateContext();
@@ -1307,12 +1308,6 @@ void Application::initLights()
 {
 	std::vector<POptix::Light*> m_lightsList = scene->mLightList;
 
-	POptix::Light directionalLight;
-	directionalLight.emission = optix::make_float3(10.0f, 10.0f, 10.0f);
-	directionalLight.lightType = POptix::ELightType::DIRECTIONAL;
-	directionalLight.direction = optix::normalize(optix::make_float3(-1.0f, 1.0f, 1.0f));
-	//m_lightsList.push_back(directionalLight);
-
 	try
 	{
 		m_bufferLightParameters = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_USER);
@@ -1360,69 +1355,6 @@ void Application::createScene()
 				}
 			}
 		}
-
-		/*
-		
-		unsigned int count;
-
-		// Demo code only!
-		// Mind that these local OptiX objects will leak when not cleaning up the scene properly on changes.
-		// Destroying the OptiX context will clean them up at program exit though.
-
-		// Add a ground plane on the xz-plane at y = 0.0f.
-		optix::Geometry geoPlane = createPlane(1, 1, 1);
-
-		optix::GeometryInstance giPlane = m_context->createGeometryInstance(); // This connects Geometries with Materials.
-		giPlane->setGeometry(geoPlane);
-		giPlane->setMaterialCount(1);
-		giPlane->setMaterial(0, m_opaqueMaterial);
-		giPlane["parMaterialIndex"]->setInt(0); // This is all! This defines which material parameters in sysMaterialParametrers to use.
-
-		optix::Acceleration accPlane = m_context->createAcceleration(m_builder);
-		setAccelerationProperties(accPlane);
-
-		optix::GeometryGroup ggPlane = m_context->createGeometryGroup(); // This connects GeometryInstances with Acceleration structures. (All OptiX nodes with "Group" in the name hold an Acceleration.)
-		ggPlane->setAcceleration(accPlane);
-		ggPlane->setChildCount(1);
-		ggPlane->setChild(0, giPlane);
-
-		// Scale the plane to go from -8 to 8.
-		float trafoPlane[16] =
-		{
-		  18.0f, 0.0f, 0.0f, 0.0f,
-		  0.0f, 18.0f, 0.0f, 0.0f,
-		  0.0f, 0.0f, 18.0f, 0.0f,
-		  0.0f, 0.0f, 0.0f, 1.0f
-		};
-		optix::Matrix4x4 matrixPlane(trafoPlane);
-
-		optix::Transform trPlane = m_context->createTransform();
-		trPlane->setChild(ggPlane);
-		trPlane->setMatrix(false, matrixPlane.getData(), matrixPlane.inverse().getData());
-
-		count = m_rootGroup->getChildCount();
-		m_rootGroup->setChildCount(count + 1);
-		m_rootGroup->setChild(count, trPlane);
-
-		float trafoOBJ[16] =
-		{
-		  1.0f, 0.0f, 0.0f, /*tx*//*0.0f,
-		  0.0f, 1.0f, 0.0f, /*ty*//*0.0f,
-		  0.0f, 0.0f, 1.0f, /*tz*//*0.0f,
-		  0.0f, 0.0f, 0.0f, 1.0f
-		};
-
-		const std::string objMatFilepath = std::string(sutil::samplesDir()) +
-			R"(\resources\Models\OBJFiles\ShaderBall\BallMainCentMatL1.obj)";
-		const std::string objStandFilepath = std::string(sutil::samplesDir()) +
-			R"(\resources\Models\OBJFiles\ShaderBall\BallStandCentMatL1.obj)";
-
-		optix::Geometry geo01 = LoadOBJ(objMatFilepath);
-		createGeometry(geo01, 2, trafoOBJ);
-		optix::Geometry geo02 = LoadOBJ(objStandFilepath);
-		createGeometry(geo02, 1, trafoOBJ);
-		*/
-
 	}
 	catch (optix::Exception& e)
 	{
