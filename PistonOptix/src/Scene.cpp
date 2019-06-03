@@ -344,18 +344,40 @@ namespace POptix
 						&node->transform[ 8], &node->transform[ 9], &node->transform[10], &node->transform[11], 
 						&node->transform[12], &node->transform[13], &node->transform[14], &node->transform[15]);
 
-					// TODO real all the mesh ID 
-					/*while (fgets(line, kMaxLineLength, file)) 
-					{
-					}*/
+					
 					unsigned int val = 0;
-					if(sscanf(line, " meshID %d", &val))
-						node->mMeshIDList.push_back(val);
+					if (sscanf(line, " meshID %d", &val))
+					{
+						// https://www.geeksforgeeks.org/extract-integers-string-c/
+						stringstream ss;
+						string meshIDString = std::string(line);
+
+						/* Storing the whole string into string stream */
+						ss << meshIDString;
+
+						/* Running loop till the end of the stream */
+						string temp;
+						int found;
+						while (!ss.eof()) {
+
+							/* extracting word by word from stream */
+							ss >> temp;
+
+							/* Checking the given word is integer or not */
+							if (stringstream(temp) >> found) 
+							{
+								cout << found << " ";
+								node->mMeshIDList.push_back(found);
+							}
+
+							/* To save from space at the end of string */
+							temp = "";
+						}
+					}
 				}
 				scene->mNodeList.emplace_back(node);
 			}
 		}
-
 		return scene;
 	}
 
@@ -417,11 +439,6 @@ namespace POptix
 
 					mesh->attributes.push_back(singleVertexData);
 					mesh->indices.push_back((unsigned int)(numOfIndicesInShape + index_offset + v));
-
-					// Optional: vertex colors
-					// tinyobj::real_t red = attrib.colors[3*idx.vertex_index+0];
-					// tinyobj::real_t green = attrib.colors[3*idx.vertex_index+1];
-					// tinyobj::real_t blue = attrib.colors[3*idx.vertex_index+2];
 				}
 				index_offset += fv;
 
