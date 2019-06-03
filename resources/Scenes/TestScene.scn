@@ -6,9 +6,9 @@ properties
 
 material bunny-mat
 {
-	color 1.0 1.0 1.0
+	color 1.0 0.0 0.0
 	metallic 1.0
-	roughness 0.13
+	roughness 0.73
 }
 
 material floor-mat
@@ -20,7 +20,7 @@ material floor-mat
 
 mesh bunny-mesh
 {
-	filepath Models/OBJFiles/Primitives/bunny.obj
+	filepath Models/OBJFiles/Primitives/box.obj
 }
 
 mesh floor-mesh
@@ -31,7 +31,7 @@ mesh floor-mesh
 node bunny-node
 {
 	materialID 0
-	transform  1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1
+	transform  1 0 0 0 0 0.15 0 1 0 0 1 0 0 0 0 1
 	meshID 0
 }
 
@@ -44,8 +44,25 @@ node floor-node
 
 light
 {
+	type Sphere
+	position 0 1.5 0
+	emission 30 30 30
+	radius 0.1125
+}
+
+#light
+{
+	type Quad
+	position 0 3 0 
+	v1 1 3 0 
+	v2 0 3 1
+	emission 2000 2000 2000
+}
+
+#light
+{
 	type Directional
-	emission 1 1 1
-	direction -1.0 1.0 1.0
+	emission 2 2 2
+	direction 0.0 1.0 0.0
 }
 

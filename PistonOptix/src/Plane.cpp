@@ -110,4 +110,45 @@ namespace POptix
 		std::cout << "createPlane(" << upAxis << "): Vertices = " << mesh->attributes.size() << ", Triangles = " << mesh->indices.size() / 3 << std::endl;
 		return mesh;
 	}
+
+	// Parallelogram from footpoint position, spanned by unnormalized vectors vecU and vecV, normal is normalized and on the CCW frontface.
+	Mesh* Scene::createParallelogram(optix::float3 const& position, optix::float3 const& vecU, optix::float3 const& vecV, optix::float3 const& normal)
+	{
+		Mesh* mesh = new Mesh;
+		//std::vector<VertexAttributes> attributes;
+		
+		VertexAttributes attrib;
+		// Same for all four vertices in this parallelogram.
+		attrib.tangent = optix::normalize(vecU);
+		attrib.normal = normal;
+
+		attrib.vertex = position - 0.5f * (vecU + vecV); // left bottom
+		attrib.texcoord = optix::make_float3(0.0f, 0.0f, 0.0f);
+		mesh->attributes.push_back(attrib);
+
+		attrib.vertex = position + 0.5f * (vecU - vecV); // right bottom
+		attrib.texcoord = optix::make_float3(1.0f, 0.0f, 0.0f);
+		mesh->attributes.push_back(attrib);
+
+		attrib.vertex = position + 0.5f * (vecU + vecV); // right top
+		attrib.texcoord = optix::make_float3(1.0f, 1.0f, 0.0f);
+		mesh->attributes.push_back(attrib);
+
+		attrib.vertex = position - 0.5f * (vecU - vecV); // left top
+		attrib.texcoord = optix::make_float3(0.0f, 1.0f, 0.0f);
+		mesh->attributes.push_back(attrib);
+
+		//std::vector<unsigned int> indices;
+
+		mesh->indices.push_back(0);
+		mesh->indices.push_back(1);
+		mesh->indices.push_back(2);
+
+		mesh->indices.push_back(2);
+		mesh->indices.push_back(3);
+		mesh->indices.push_back(0);
+
+		std::cout << "createParallelogram(): Vertices = " << mesh->attributes.size() << ", Triangles = " << mesh->indices.size() / 3 << std::endl;
+		return mesh;
+	}
 }

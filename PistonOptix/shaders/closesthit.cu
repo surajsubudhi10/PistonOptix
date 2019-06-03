@@ -37,7 +37,7 @@ rtBuffer< rtCallableProgramId<void(POptix::Material &mat, State &state, PerRayDa
 rtBuffer< rtCallableProgramId<void(POptix::Material &mat, State &state, PerRayData &prd)> > sysBRDFSample;
 rtBuffer< rtCallableProgramId<float3(POptix::Material &mat, State &state, PerRayData &prd)> > sysBRDFEval;
 
-rtBuffer< rtCallableProgramId<void(POptix::Light &light, PerRayData &prd, POptix::LightSample &sample)> > sysLightSample;
+rtBuffer< rtCallableProgramId<void(POptix::Light &light, PerRayData &prd, POptix::LightSample &sample, State& state)> > sysLightSample;
 rtBuffer<POptix::Light> sysLightParameters;
 rtDeclareVariable(int, sysNumberOfLights, , );
 
@@ -76,10 +76,8 @@ RT_PROGRAM void closesthit()
 	state.shading_normal = shading_normal;
 	state.geometry_normal = geoNormal;
 
-	// A material system with support for arbitrary mesh lights would evaluate its emission here.
-	thePrd.radiance = make_float3(0.0f);
-
 	// Start fresh with the next BSDF sample.  (Either of these values remaining zero is an end-of-path condition.)
+	thePrd.radiance = make_float3(0.0f);
 	thePrd.f_over_pdf = make_float3(0.0f);
 	thePrd.pdf = 0.0f;
 
@@ -141,7 +139,10 @@ RT_PROGRAM void closesthit()
 		POptix::Light light = sysLightParameters[lightSample.index];
 		const POptix::ELightType lightType = light.lightType;
 
-		sysLightSample[lightType](light, thePrd, lightSample); // lightSample direction and distance returned in world space!
+		sysLightSample[lightType](light, thePrd, lightSample, state); // lightSample direction and distance returned in world space!
+
+		rtPrintf("Light Index : %d \n", lightSample.index);
+		rtPrintf("Light pdf : %f \n", lightSample.pdf);
 
 		if (lightSample.pdf > 0.0f) // Useful light sample?
 		{
@@ -164,6 +165,9 @@ RT_PROGRAM void closesthit()
 				pdf = thePrd.pdf;
 			}
 
+			
+			rtPrintf("PDF : %f \n", pdf);
+
 			if (0.0f < pdf && isNotNull(feval))
 			{
 				// Do the visibility check of the light sample.
@@ -172,13 +176,20 @@ RT_PROGRAM void closesthit()
 
 				// Note that the sysSceneEpsilon is applied on both sides of the shadow ray [t_min, t_max] interval 
 				// to prevent self intersections with the actual light geometry in the scene!
+				rtPrintf("lightSample.direction : %f, %f, %f\n", lightSample.direction.x, lightSample.direction.y, lightSample.direction.z);
+				rtPrintf("Light distance : %f \n", lightSample.distance);
 				optix::Ray ray = optix::make_Ray(thePrd.hit_pos, lightSample.direction, 1, sysSceneEpsilon, lightSample.distance - sysSceneEpsilon); // Shadow ray.
 				rtTrace(sysTopObject, ray, prdShadow);
 
 				if (prdShadow.visible)
 				{
-					const float misWeight = powerHeuristic(lightSample.pdf, pdf);
-					thePrd.radiance += feval * lightSample.emission * (misWeight * fabsf(optix::dot(lightSample.direction, shading_normal)) / lightSample.pdf);
+					//float NdotL = dot(shading_normal, -lightSample.direction);
+					//float lightPdf = lightSample.pdf < 0.0f ? (lightSample.distance * lightSample.distance) / (light.area * NdotL) : lightSample.pdf;
+
+					float lightPdf = lightSample.pdf;
+					rtPrintf("Light PDF : %f \n", lightPdf);
+					const float misWeight = powerHeuristic(lightPdf, pdf);
+					thePrd.radiance += feval * lightSample.emission * (misWeight * fabsf(optix::dot(lightSample.direction, shading_normal)) / lightPdf);
 				}
 			}
 		}

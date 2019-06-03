@@ -21,6 +21,7 @@ OPTIX_add_sample_executable( PistonOptix
   inc/LightParameters.h
   
   inc/MyAssert.h
+  inc/StaticFunctions.h
 
   inc/CudaUtils/State.h
 
@@ -41,6 +42,7 @@ OPTIX_add_sample_executable( PistonOptix
   shaders/miss.cu
 
   shaders/closesthit.cu
+  shaders/closesthit_light.cu
   shaders/lambert.cu
   shaders/OrenNayer.cu
   shaders/PhongModified.cu
