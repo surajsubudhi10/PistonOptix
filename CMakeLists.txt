@@ -121,7 +121,7 @@ if( APPLE )
   set( CUDA_TOOLKIT_RPATH_FLAG "-Wl,-rpath,${CUDA_TOOLKIT_ROOT_DIR}/lib" )
 endif()
 
-set(OptiX_INSTALL_DIR "C:\\ProgramData\\NVIDIA Corporation\\OptiX SDK 5.1.1")
+#set(OptiX_INSTALL_DIR "C:\\ProgramData\\NVIDIA Corporation\\OptiX SDK 5.1.1")
 
 # Search for the OptiX libraries and include files.
 find_package(OptiX REQUIRED)

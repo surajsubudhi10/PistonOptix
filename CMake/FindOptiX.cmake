@@ -37,7 +37,7 @@ else()
   set(bit_dest "")
 endif()
 
-set(OptiX_INSTALL_DIR "" CACHE PATH "Path to OptiX installed location.")
+#set(OptiX_INSTALL_DIR "" CACHE PATH "Path to OptiX installed location.")
 
 macro(OPTIX_find_api_library name version)
   find_library(${name}_LIBRARY
