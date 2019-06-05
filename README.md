@@ -1,8 +1,8 @@
-##PistonOptix
+## PistonOptix
 
 A Real time Path Tracer using Monte Carlo simulation for rendering based on NVIDIA Optix SDK and using GLFW and OpenGL for viewer. The feature set is very basic since this is just a learning exercise and inspired from Nvidia's Optix Advanced Samples.
 
-##Quick Start
+## Quick Start
 * You will need CMake to build the code. As of now this project only support Windows, so you need Visual Studio 2015 or 2017 in addition to CMake. 
 * Install Optix 5.0 or higher and CUDA v9.2 or higher.
 
@@ -21,7 +21,7 @@ If you have installed Optix SDK in different director you need to add the path o
 It will generate .sln files along with separate visual studio projects file. Run the `PistonOptix.sln` file.
 
 
-##Features
+## Features
 
 * Unidirectional Path Tracing
 * Lambertian and Microfacet BRDF
@@ -30,5 +30,5 @@ It will generate .sln files along with separate visual studio projects file. Run
 * Mesh Loading
 * Loading scene from .scn file (can be any text file with given schema inside resources Scenes folder)
 
-##Examples
+## Examples
 Here are some of the rendered snaps form the project.
