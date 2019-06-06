@@ -1,27 +1,5 @@
-//-----------------------------------------------------------------------------
-//
-// PistonOptix
-// Shows additionally how to ...
-// - build a box and torus geometry from an indexed triangle mesh.
-// - implement a fast iterative brute force path tracer (no direct lighting).
-// - implement a progressive renderer, accumulating values in an input_output buffer.
-// - automatic antialiasing of image by sub-pixel jittering inside the ray generation program.
-// - separating the integrator into an inlined function.
-// - implement a diffuse reflection shading (Lambert) inside a closest hit program.
-// - connect all material parameters in a buffer with individual scene objects.
-// - use the variable scoping in OptiX to minimize the number of Material nodes needed.
-// - use the maximum path length limit to automatically generate ambient occlusion results.
-// - implement a tonemapper post-process as GLSL shader working on HDR data.
-// - use the time class to schedule image updates only once per second to improve performance (reduced PCI-E bandwidth).
-// - drive renderer system and tonemapper settings and material parameters from the GUI.
-// - visualize incorrect results in the output (negative, infinite, and not-a-number) for debugging.
-//
-//-----------------------------------------------------------------------------
-
 #include "shaders/app_config.h"
-
 #include "inc/Application.h"
-
 #include <sutil.h>
 
 #include <cstdlib>
@@ -30,7 +8,6 @@
 #include <string>
 
 static Application* g_app = nullptr;
-
 static bool displayGUI = true;
 
 static void error_callback(int error, const char* description)
@@ -67,7 +44,7 @@ int main(int argc, char *argv[])
 	std::string environment = std::string(sutil::samplesDir()) + "/data/NV_Default_HDR_3000x1500.hdr";
 
 	std::string filenameScreenshot = "PistonOptix.png";
-	bool hasGUI = true;
+	bool showViewer = true;
 
 	// Parse the command line parameters.
 	for (int i = 1; i < argc; ++i)
@@ -132,7 +109,7 @@ int main(int argc, char *argv[])
 				return 0;
 			}
 			filenameScreenshot = argv[++i];
-			hasGUI = false; // Do not render the GUI when just taking a screenshot. (Automated QA feature.)
+			showViewer = false; // Do not render the GUI when just taking a screenshot. (Automated QA feature.)
 		}
 		else
 		{
@@ -150,6 +127,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	glfwWindowHint(GLFW_VISIBLE, showViewer);
 	GLFWwindow* window = glfwCreateWindow(windowWidth, windowHeight, "PistonOptix", nullptr, nullptr);
 	if (!window)
 	{
@@ -186,7 +164,7 @@ int main(int argc, char *argv[])
 
 		g_app->reshape(windowWidth, windowHeight);
 
-		if (hasGUI)
+		if (showViewer)
 		{
 			g_app->guiNewFrame();
 
