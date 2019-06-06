@@ -5,11 +5,6 @@ project(PistonOptiX)
 # This enforces a particular version of CMake that we require to process the script files
 # properly.
 cmake_minimum_required(VERSION 3.1.1 FATAL_ERROR)
-
-# As of CMake 2.6 policies were introduced in order to provide a mechanism for
-# adding backwards compatibility one feature at a time.  We will just specify
-# that all policies will use version 2.6 symantics.
-#cmake_policy(VERSION 3.2)
 cmake_policy(SET CMP0074 NEW)
 
 # Add paths to our CMake code to the module path, so they can be found automatically by
@@ -54,7 +49,7 @@ endif()
 find_package(CUDA 9.0 REQUIRED)
 find_package(OpenGL REQUIRED)
 
-# Optional: When IL_FOUND is false after this call, the OptiX introduction samples optixIntro_07 and higher will not be built.
+# Optional: When IL_FOUND is false after this call, require for texture handling
 find_package(DevIL)
 
 if ( OPENGL_FOUND AND OPENGL_INCLUDE_DIR )
@@ -233,44 +228,43 @@ add_subdirectory(PistonOptix)
 add_subdirectory(sutil)
 
 # This copies out dlls into the build directories, so that users no longer need to copy
-# them over in order to run the samples.  This depends on the optixHello sample being compiled.
-# If you remove this sample from the list of compiled samples, then you should change
-# "optixHello" found below to the name of one of your other samples.
+# them over in order to run the samples.
 
-#if(WIN32)
-#  if(CMAKE_SIZEOF_VOID_P EQUAL 8 AND NOT APPLE)
-#    set(bit_dest "64")
-#  else()
-#    set(bit_dest "")
-#  endif()
-#  foreach(config ${CMAKE_CONFIGURATION_TYPES})
-#    cmake_policy(SET CMP0074 NEW)  # disable warning about LOCATION property
-#    get_target_property(loc PistonOptix ${config}_LOCATION)
-#    if(loc)
-#      # A little helper function
-#      function(copy_dll lib)
-#        get_filename_component(path ${loc} PATH)
-#        get_filename_component(name ${lib} NAME)
-#        #message("${CMAKE_COMMAND} -E copy_if_different ${lib} ${path}/${name}")
-#        execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different ${lib} ${path}/${name})
-#      endfunction()
-#      
-#      # Copy OptiX and optional DevIL dlls from their binary directories into the build
-#      get_filename_component( path_to_optix_dll ${optix_DLL} PATH )
-#      file(GLOB dlls "${path_to_optix_dll}/*.dll")
-#      if (IL_FOUND)
-#        get_filename_component( path_to_devil_dll ${IL_LIBRARIES} PATH )
-#        file(GLOB devil_dlls "${path_to_devil_dll}/*.dll")
-#        list(APPEND dlls ${devil_dlls})
-#      endif()
-#      foreach(file ${dlls})
-#        copy_dll("${file}")
-#      endforeach()
-#    else()
-#      message(WARNING "Unable to find location to copy DLLs into the build")
-#    endif()
-#  endforeach()
-#endif(WIN32)
+if(WIN32)
+  if(CMAKE_SIZEOF_VOID_P EQUAL 8 AND NOT APPLE)
+    set(bit_dest "64")
+  else()
+    set(bit_dest "")
+  endif()
+  foreach(config ${CMAKE_CONFIGURATION_TYPES})
+    cmake_policy(SET CMP0026 OLD)  # disable warning about LOCATION property
+    get_target_property(loc PistonOptix ${config}_LOCATION)
+	message(${loc})
+    if(loc)
+      # A little helper function
+      function(copy_dll lib)
+        get_filename_component(path ${loc} PATH)
+        get_filename_component(name ${lib} NAME)
+        #message("${CMAKE_COMMAND} -E copy_if_different ${lib} ${path}/${name}")
+        execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different ${lib} ${path}/${name})
+      endfunction()
+      
+      # Copy OptiX and optional DevIL dlls from their binary directories into the build
+      get_filename_component( path_to_optix_dll ${optix_DLL} PATH )
+      file(GLOB dlls "${path_to_optix_dll}/*.dll")
+      if (IL_FOUND)
+        get_filename_component( path_to_devil_dll ${IL_LIBRARIES} PATH )
+        file(GLOB devil_dlls "${path_to_devil_dll}/*.dll")
+        list(APPEND dlls ${devil_dlls})
+      endif()
+      foreach(file ${dlls})
+        copy_dll("${file}")
+      endforeach()
+    else()
+      message(WARNING "Unable to find location to copy DLLs into the build")
+    endif()
+  endforeach()
+endif(WIN32)
 
 #################################################################
 

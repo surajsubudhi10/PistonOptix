@@ -10,5 +10,3 @@ cd builds
 
 cmake -G "Visual Studio 15 2017 Win64" -DOptiX_INSTALL_DIR=%Optix_Path% ..
 cd ..
-
-pause
