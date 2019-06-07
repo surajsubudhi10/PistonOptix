@@ -13,7 +13,7 @@ cd PistonOptix
 ```
 
 Now into the project folder run the `win_builds.bat` file in command line.
-If you have installed Optix SDK in different director you need to add the path of the Optix direction along with `win_builds.bat` batch file. 
+If you have installed Optix SDK in different directory or different version (default Optix 5.1.1) then you need to add the path of the Optix direction along with `win_builds.bat` batch file. 
 
 ```
 \PistonOptix>.\win_builds.bat "< Optix SDK path inside double quote >"
@@ -28,7 +28,9 @@ It will generate .sln files along with separate visual studio projects file. Run
 * Rect and Directional lights
 * Multiple Importance Sampling
 * Mesh Loading
-* Loading scene from .scn file (can be any text file with given schema inside resources Scenes folder)
+* Loading scene from .scn file
 
 ## Examples
 Here are some of the rendered snaps form the project.
+
+![Bunny](./resources/Samples/Sample01.png)
