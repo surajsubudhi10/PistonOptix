@@ -20,7 +20,7 @@ namespace POptix
 	struct Light
 	{
 		optix::float3 position;
-		optix::float3 direction;
+		optix::float3 direction;	// for area light its the normal direction
 		optix::float3 emission;
 		optix::float3 u;
 		optix::float3 v;

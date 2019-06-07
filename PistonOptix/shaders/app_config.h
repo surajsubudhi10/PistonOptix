@@ -14,7 +14,7 @@
 
 // 0 == Disable all OptiX exceptions, rtPrintfs and rtAssert functionality. (Benchmark only in this mode!)
 // 1 == Enable  all OptiX exceptions, rtPrintfs and rtAssert functionality. (Really only for debugging, big performance hit!)
-#define USE_DEBUG_EXCEPTIONS 0
+#define USE_DEBUG_EXCEPTIONS 1
 
 #define USE_SHADER_TONEMAP 0
 #define USE_NEXT_EVENT_ESTIMATION 1

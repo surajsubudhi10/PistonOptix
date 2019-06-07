@@ -115,7 +115,7 @@ private:
 
 	//optix::Geometry LoadOBJ(std::string objPath);
 
-	void createGeometry(optix::Geometry& geometry, uint materialID, float* transform);
+	void createGeometry(optix::Geometry& geometry, optix::Material& material, uint materialID, float* transform);
 	optix::Geometry createGeometry(std::vector<VertexAttributes> const& attributes, std::vector<unsigned int> const& indices);
 
 	void setAccelerationProperties(optix::Acceleration acceleration);
@@ -210,6 +210,7 @@ private:
 	Timer m_timer;
 
 	optix::Material m_opaqueMaterial;
+	optix::Material m_lightMaterial;
 
 	// The root node of the OptiX scene graph (sysTopObject)
 	optix::Group        m_rootGroup;

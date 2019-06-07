@@ -5,26 +5,10 @@
 
 #include <iostream>
 #include <sutil.h>
+#include "inc/StaticFunctions.h"
 
 namespace POptix
 {
-	static std::string getFileName(const std::string& filePath)
-	{
-		char sep = '/';
-
-#ifdef _WIN32
-		sep = '\\';
-#endif
-
-		size_t i = filePath.rfind(sep, filePath.length());
-		if (i != std::string::npos)
-		{
-			return(filePath.substr(i + 1, filePath.length() - i));
-		}
-
-		return("");
-	}
-
 	static std::string getDirectoryPath(const std::string& filename)
 	{
 		char sep = '/';
@@ -298,8 +282,8 @@ namespace POptix
 					sscanf(line, " direction %f %f %f", &light->direction.x, &light->direction.y, &light->direction.z);
 
 					sscanf(line, " radius %f", &light->radius);
-					sscanf(line, " u %f %f %f", &light->u.x, &light->u.y, &light->u.z);
-					sscanf(line, " v %f %f %f", &light->v.x, &light->v.y, &light->v.z);
+					sscanf(line, " v1 %f %f %f", &v1.x, &v1.y, &v1.z);
+					sscanf(line, " v2 %f %f %f", &v2.x, &v2.y, &v2.z);
 					sscanf(line, " type %s", light_type);
 				}
 
@@ -418,7 +402,6 @@ namespace POptix
 		}
 		return scene;
 	}
-
 
 	Mesh* Scene::LoadOBJ(std::string inputfile)
 	{
