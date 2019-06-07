@@ -44,9 +44,10 @@ Application::Application(GLFWwindow* window,
 	, m_stackSize(stackSize)
 	, m_interop(interop)
 {
-	//scene = new POptix::Scene;
-	//scene->build();
-	scene = POptix::Scene::LoadScene((std::string(sutil::samplesDir()) + "\\resources\\Scenes\\TestScene.scn").c_str());
+	scene = POptix::Scene::LoadScene((std::string(sutil::samplesDir()) + "\\resources\\Scenes\\TestScene\\TestScene.scn").c_str());
+	m_width = scene->properties.width;
+	m_height = scene->properties.height;
+	glfwSetWindowSize(m_window, m_width, m_height);
 
 	// Setup ImGui binding.
 	ImGui::CreateContext();
@@ -693,16 +694,17 @@ void Application::guiWindow()
 
  	ImGui::SetNextWindowSize(ImVec2(200, 200), ImGuiSetCond_FirstUseEver);
 	ImGuiWindowFlags window_flags = 0;
+	
+	sutil::displayFps(m_frameCount++);
+	sutil::displaySpp(m_iterationIndex, 2.0f, 40.0f);
+	
 	if (!ImGui::Begin("PistonOptix", nullptr, window_flags)) // No bool flag to omit the close button.
 	{
 		// Early out if the window is collapsed, as an optimization.
 		ImGui::End();
 		return;
 	}
-
 	ImGui::PushItemWidth(-100); // right-aligned, keep 180 pixels for the labels.
-	sutil::displayFps(m_frameCount++);
-	sutil::displaySpp(m_iterationIndex, 2.0f, 40.0f);
 
 	if (ImGui::CollapsingHeader("System"))
 	{
