@@ -1177,7 +1177,8 @@ void Application::updateMaterialParameters()
 void Application::updateLightParameters()
 {
 	POptix::Light* dst = static_cast<POptix::Light*>(m_bufferLightParameters->map(0, RT_BUFFER_MAP_WRITE_DISCARD));
-	for (size_t i = 0; i < scene->mLightList.size(); ++i, ++dst) {
+	for (size_t i = 0; i < scene->mLightList.size(); ++i, ++dst) 
+	{
 		POptix::Light* mat = scene->mLightList[i];
 
 		dst->position	= mat->position;
@@ -1186,8 +1187,9 @@ void Application::updateLightParameters()
 		dst->area		= mat->area;
 		dst->u			= mat->u;
 		dst->v			= mat->v;
-		dst->direction	= mat->direction;
+		dst->normal		= mat->normal;
 		dst->lightType	= mat->lightType;
+		dst->isDelta	= mat->isDelta;
 	}
 	m_bufferLightParameters->unmap();
 }
@@ -1309,7 +1311,7 @@ void Application::createScene()
 			
 			if (light->lightType == POptix::ELightType::QUAD)
 			{
-				lightMesh = POptix::Scene::createParallelogram(make_float3(0.0f), light->u, light->v, light->direction);
+				lightMesh = POptix::Scene::createParallelogram(make_float3(0.0f), light->u, light->v, light->normal);
 			}
 			else if (light->lightType == POptix::ELightType::SPHERE)
 			{

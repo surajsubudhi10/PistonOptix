@@ -39,32 +39,40 @@ RT_CALLABLE_PROGRAM void sphere_sample(POptix::Light &light, PerRayData &prd, PO
 	sample.pdf = lightDistSq / (light.area);
 }
 
-RT_CALLABLE_PROGRAM void quad_sample(POptix::Light &light, PerRayData &prd, POptix::LightSample &sample, State& state)
-{
-	const float r1 = rng(prd.seed);
-	const float r2 = rng(prd.seed);
-	sample.surfacePos = light.position + light.u * r1 + light.v * r2;
-	sample.direction = light.direction;
-	sample.emission = light.emission * sysNumberOfLights;
-	sample.distance = length(sample.surfacePos - state.hit_position);
-
-	if (DENOMINATOR_EPSILON < sample.distance)
-	{
-		sample.direction /= sample.distance; // Normalized direction to light.
-
-		const float cosTheta = optix::dot(-sample.direction, light.direction);
-		if (DENOMINATOR_EPSILON < cosTheta) // Only emit light on the front side.
-		{
-			// Explicit light sample, must scale the emission by inverse probabilty to hit this light.
-			sample.pdf = (sample.distance * sample.distance) / (light.area * cosTheta); // Solid angle pdf. Assumes light.area != 0.0f.
-		}
-	}
-}
-
 RT_CALLABLE_PROGRAM void directional_sample(POptix::Light &light, PerRayData &prd, POptix::LightSample &sample, State& state)
 {
-	sample.direction = light.direction;
+	sample.direction = -light.normal;
 	sample.distance = RT_DEFAULT_MAX;
 	sample.emission = light.emission * sysNumberOfLights;
 	sample.pdf = 1.0f;
+}
+
+
+RT_CALLABLE_PROGRAM void quad_sample(POptix::Light &light, PerRayData &prd, POptix::LightSample &sample, State& state) 
+{
+	const float r1 = rng(prd.seed);
+	const float r2 = rng(prd.seed);
+	
+	// position on the area light
+	sample.surfacePos = light.position + light.u * r1 + light.v * r2;
+	sample.pdf = 1.0f / light.area;
+
+	// light ray direction
+	float3 wi = normalize(sample.surfacePos - state.hit_position);
+	float distance = length(sample.surfacePos - state.hit_position);
+
+	float cosTheta = fabsf(dot(light.normal, -wi));
+	if (cosTheta < DENOMINATOR_EPSILON) 
+	{
+		sample.pdf = 0.0f;
+		return;
+	}
+
+	sample.pdf *= (distance * distance) / cosTheta;
+	if (sample.pdf > 10E19) 
+		sample.pdf = 0.0f;
+
+	sample.distance = distance;
+	sample.direction = wi;
+	sample.emission = light.emission;
 }

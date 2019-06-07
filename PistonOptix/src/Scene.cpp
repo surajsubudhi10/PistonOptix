@@ -9,35 +9,7 @@
 
 namespace POptix
 {
-	static std::string getDirectoryPath(const std::string& filename)
-	{
-		char sep = '/';
-
-#ifdef _WIN32
-		sep = '\\';
-#endif
-
-		const size_t last_slash_idx = filename.rfind(sep);
-		if (std::string::npos != last_slash_idx)
-		{
-			return filename.substr(0, last_slash_idx);
-		}
-
-		return("");
-	}
-
-	static std::string getFileExtension(const std::string& filename)
-	{
-		char sep = '.';
-
-		const size_t last_dot_idx = filename.rfind(sep);
-		if (last_dot_idx != std::string::npos)
-		{
-			return(filename.substr(last_dot_idx + 1, filename.length() - last_dot_idx));
-		}
-
-		return("");
-	}
+	
 
 	Scene::Scene()
 	{
@@ -174,7 +146,7 @@ namespace POptix
 		Light* directionalLight = new Light();
 		directionalLight->emission = optix::make_float3(10.0f, 10.0f, 10.0f);
 		directionalLight->lightType = POptix::ELightType::DIRECTIONAL;
-		directionalLight->direction = optix::normalize(optix::make_float3(-1.0f, 1.0f, 1.0f));
+		directionalLight->normal = optix::normalize(optix::make_float3(-1.0f, 1.0f, 1.0f));
 		mLightList.emplace_back(directionalLight);
 
 		mCamera = new PinholeCamera();
@@ -267,6 +239,7 @@ namespace POptix
 				light->radius = 1.0f;
 				light->u = make_float3(1.0f, 0.0f, 0.0f);
 				light->v = make_float3(0.0f, 0.0f, 1.0f);
+				light->isDelta = false;
 
 				optix::float3 v1, v2;
 				char light_type[20] = "None";
@@ -279,7 +252,7 @@ namespace POptix
 
 					sscanf(line, " position %f %f %f", &light->position.x, &light->position.y, &light->position.z);
 					sscanf(line, " emission %f %f %f", &light->emission.x, &light->emission.y, &light->emission.z);
-					sscanf(line, " direction %f %f %f", &light->direction.x, &light->direction.y, &light->direction.z);
+					sscanf(line, " direction %f %f %f", &light->normal.x, &light->normal.y, &light->normal.z);
 
 					sscanf(line, " radius %f", &light->radius);
 					sscanf(line, " v1 %f %f %f", &v1.x, &v1.y, &v1.z);
@@ -293,18 +266,19 @@ namespace POptix
 					light->u = v1 - light->position;
 					light->v = v2 - light->position;
 					light->area = optix::length(optix::cross(light->u, light->v));
-					light->direction = optix::normalize(optix::cross(light->u, light->v));
+					light->normal = optix::normalize(optix::cross(light->u, light->v));
 				}
 				else if (strcmp(light_type, "Sphere") == 0)
 				{
 					light->lightType = SPHERE;
-					light->direction = optix::normalize(light->direction);
+					light->normal = optix::normalize(light->normal);
 					light->area = 4.0f * M_PIf * light->radius * light->radius;
 				}
 				else if (strcmp(light_type, "Directional") == 0)
 				{
 					light->lightType = DIRECTIONAL;
-					light->direction = optix::normalize(light->direction);
+					light->normal = optix::normalize(light->normal);
+					light->isDelta = true;
 				}
 				else if (strcmp(light_type, "Environment") == 0)
 				{

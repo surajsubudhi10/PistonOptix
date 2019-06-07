@@ -20,6 +20,6 @@ RT_PROGRAM void miss_environment_constant()
 	float v = 0.5f * (1.0f + sin(phi));
 	float3 result = make_float3(tex2D(envmap, u, v));
 
-	thePrd.radiance = result;// make_float3(1.0f); // Constant white emission. No next event estimation (direct lighting).
+	thePrd.radiance = make_float3(0.0f); // Constant white emission. No next event estimation (direct lighting).
 	thePrd.flags |= FLAG_TERMINATE;    // End of path.
 }
