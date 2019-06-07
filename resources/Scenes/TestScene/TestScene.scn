@@ -1,0 +1,51 @@
+properties
+{
+	width 400
+	height 300
+}
+
+material bunny-mat
+{
+	color 1.0 1.0 1.0
+	metallic 1.0
+	roughness 0.13
+}
+
+material floor-mat
+{
+	color 0.4 0.4 0.4
+	metallic 0.0
+	roughness 0.8
+}
+
+mesh bunny-mesh
+{
+	filepath Models/bunny.obj
+}
+
+mesh floor-mesh
+{
+	filepath Models/plane.obj
+}
+
+node bunny-node
+{
+	materialID 0
+	transform  1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1
+	meshID 0
+}
+
+node floor-node
+{
+	materialID 1
+	transform  1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1
+	meshID 1
+}
+
+light
+{
+	type Directional
+	emission 1 1 1
+	direction -1.0 1.0 1.0
+}
+

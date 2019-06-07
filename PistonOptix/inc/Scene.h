@@ -20,6 +20,7 @@ namespace POptix
 		int width;
 		int height;
 		string sceneName;
+		string sceneDirectoryPath;
 	};
 
 	struct Mesh

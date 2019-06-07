@@ -8,7 +8,7 @@
 
 namespace POptix
 {
-	static std::string getFileName(const std::string& s) 
+	static std::string getFileName(const std::string& filePath)
 	{
 		char sep = '/';
 
@@ -16,10 +16,40 @@ namespace POptix
 		sep = '\\';
 #endif
 
-		size_t i = s.rfind(sep, s.length());
+		size_t i = filePath.rfind(sep, filePath.length());
 		if (i != std::string::npos)
 		{
-			return(s.substr(i + 1, s.length() - i));
+			return(filePath.substr(i + 1, filePath.length() - i));
+		}
+
+		return("");
+	}
+
+	static std::string getDirectoryPath(const std::string& filename)
+	{
+		char sep = '/';
+
+#ifdef _WIN32
+		sep = '\\';
+#endif
+
+		const size_t last_slash_idx = filename.rfind(sep);
+		if (std::string::npos != last_slash_idx)
+		{
+			return filename.substr(0, last_slash_idx);
+		}
+
+		return("");
+	}
+
+	static std::string getFileExtension(const std::string& filename)
+	{
+		char sep = '.';
+
+		const size_t last_dot_idx = filename.rfind(sep);
+		if (last_dot_idx != std::string::npos)
+		{
+			return(filename.substr(last_dot_idx + 1, filename.length() - last_dot_idx));
 		}
 
 		return("");
@@ -169,15 +199,27 @@ namespace POptix
 	static const int kMaxLineLength = 2048;
 	Scene* Scene::LoadScene(const char* sceneFilePath)
 	{
-		Scene *scene = new Scene;
+		auto fileexten = getFileExtension(sceneFilePath);
+		if(getFileExtension(sceneFilePath) != "scn")
+		{
+			std::cerr << "Error! Only supports .scn file. \n";
+			exit(1);
+		}
 
 		FILE* file = fopen(sceneFilePath, "r");
-
 		if (!file)
 		{
 			printf("Couldn't open %s for reading.", sceneFilePath);
 			return nullptr;
 		}
+
+		Scene *scene = new Scene;
+		Properties prop;
+		prop.width = 1280;
+		prop.height = 720;
+		prop.sceneName = getFileName(sceneFilePath);
+		prop.sceneDirectoryPath = getDirectoryPath(sceneFilePath);
+		scene->properties = prop;
 
 		char line[kMaxLineLength];
 		while (fgets(line, kMaxLineLength, file)) 
@@ -185,6 +227,25 @@ namespace POptix
 			// skip comments
 			if (line[0] == '#')
 				continue;
+
+			//------------------------------------------//
+			//				Properties					//
+			//------------------------------------------//
+			if (strstr(line, "properties"))
+			{
+
+				while (fgets(line, kMaxLineLength, file))
+				{
+					// end group
+					if (strchr(line, '}'))
+						break;
+
+					sscanf(line, " width %i", &prop.width);
+					sscanf(line, " height %i", &prop.height);
+					sscanf(line, " name %s", &prop.sceneName);
+				}
+				scene->properties = prop;
+			}
 
 			// name used for materials and meshes
 			char name[kMaxLineLength] = { 0 };
@@ -270,31 +331,6 @@ namespace POptix
 			}
 
 			//------------------------------------------//
-			//				Properties					//
-			//------------------------------------------//
-			Properties prop;
-			prop.width = 1280;
-			prop.height = 720;
-			prop.sceneName = getFileName(sceneFilePath);
-			scene->properties = prop;
-
-			if (strstr(line, "properties"))
-			{
-
-				while (fgets(line, kMaxLineLength, file))
-				{
-					// end group
-					if (strchr(line, '}'))
-						break;
-
-					sscanf(line, " width %i", &prop.width);
-					sscanf(line, " height %i", &prop.height);
-					sscanf(line, " name %s", &prop.sceneName);
-				}
-				scene->properties = prop;
-			}
-
-			//------------------------------------------//
 			//				Mesh						//
 			//------------------------------------------//
 			if (sscanf(line, " mesh %s", name) == 1)
@@ -312,7 +348,9 @@ namespace POptix
 					if (sscanf(line, " filepath %s", path) == 1)
 					{
 						unsigned int meshCount = scene->mMeshList.size();
-						Mesh* mesh = LoadOBJ((std::string(sutil::samplesDir()) + "\\resources\\" + std::string(path)));
+						
+						string OBJfilePath = scene->properties.sceneDirectoryPath + "\\" + path;
+						Mesh* mesh = LoadOBJ(OBJfilePath);
 						mesh->name = name;
 						mesh->filePath = path;
 						mesh->ID = meshCount;
