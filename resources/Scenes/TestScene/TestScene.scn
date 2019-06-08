@@ -1,7 +1,7 @@
 properties
 {
-	width 400
-	height 300
+	width 1280
+	height 720
 }
 
 material bunny-mat
@@ -42,10 +42,18 @@ node floor-node
 	meshID 1
 }
 
-light
+#light
 {
 	type Directional
 	emission 1 1 1
-	direction -1.0 1.0 1.0
+	direction 1.0 -1.0 -1.0
 }
 
+light
+{
+	position 0 4 0
+	emission 50 50 50
+	v1 1 4 0
+	v2 0 4 1
+	type Quad
+}

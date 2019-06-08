@@ -37,20 +37,11 @@ rtBuffer< rtCallableProgramId<void(POptix::Material &mat, State &state, PerRayDa
 rtBuffer< rtCallableProgramId<void(POptix::Material &mat, State &state, PerRayData &prd)> > sysBRDFSample;
 rtBuffer< rtCallableProgramId<float3(POptix::Material &mat, State &state, PerRayData &prd)> > sysBRDFEval;
 
-rtBuffer< rtCallableProgramId<void(POptix::Light &light, PerRayData &prd, POptix::LightSample &sample)> > sysLightSample;
+rtBuffer< rtCallableProgramId<void(POptix::Light &light, PerRayData &prd, POptix::LightSample &sample, State& state)> > sysLightSample;
 rtBuffer<POptix::Light> sysLightParameters;
 rtDeclareVariable(int, sysNumberOfLights, , );
 
-RT_FUNCTION float sdot(float3 x, float3 y)
-{
-	return clamp(dot(x, y), 0.0f, 1.0f);
-}
-
-RT_FUNCTION float SmoothnessToPhongAlpha(float s)
-{
-	return pow(1000.0f, s * s);
-}
-
+RT_FUNCTION float3 DirectLighting(POptix::Material &mat, State& state);
 
 RT_PROGRAM void closesthit()
 {
@@ -76,10 +67,8 @@ RT_PROGRAM void closesthit()
 	state.shading_normal = shading_normal;
 	state.geometry_normal = geoNormal;
 
-	// A material system with support for arbitrary mesh lights would evaluate its emission here.
-	thePrd.radiance = make_float3(0.0f);
-
 	// Start fresh with the next BSDF sample.  (Either of these values remaining zero is an end-of-path condition.)
+	thePrd.radiance = make_float3(0.0f);
 	thePrd.f_over_pdf = make_float3(0.0f);
 	thePrd.pdf = 0.0f;
 
@@ -134,55 +123,7 @@ RT_PROGRAM void closesthit()
 	thePrd.f_over_pdf = f * fabsf(optix::dot(thePrd.wi, state.shading_normal)) / thePrd.pdf;
 
 #if USE_NEXT_EVENT_ESTIMATION
-	if ((thePrd.brdf_flags & (POptix::BSDF_DIFFUSE | POptix::BSDF_GLOSSY)) && 0 < sysNumberOfLights)
-	{
-		POptix::LightSample lightSample; // Sample one of many lights.
-		lightSample.index = optix::clamp(static_cast<int>(floorf(rng(thePrd.seed) * sysNumberOfLights)), 0, sysNumberOfLights - 1);
-		POptix::Light light = sysLightParameters[lightSample.index];
-		const POptix::ELightType lightType = light.lightType;
-
-		sysLightSample[lightType](light, thePrd, lightSample); // lightSample direction and distance returned in world space!
-
-		if (lightSample.pdf > 0.0f) // Useful light sample?
-		{
-			float3 feval = make_float3(0.0f);
-			float pdf = 0.0f;
-
-			if (thePrd.brdf_flags & POptix::BSDF_DIFFUSE)
-			{
-				// Diffuse evaluation
-				// Evaluate the Lambert BSDF in the light sample direction. Normally cheaper than shooting rays.
-				sysBRDFPdf[POptix::EBrdfTypes::LAMBERT](mat, state, thePrd);
-				feval = sysBRDFEval[POptix::EBrdfTypes::LAMBERT](mat, state, thePrd);
-				pdf = thePrd.pdf;
-			}
-			else if (thePrd.brdf_flags & POptix::BSDF_GLOSSY)
-			{
-				// Specular evaluation
-				sysBRDFPdf[POptix::EBrdfTypes::MICROFACET_REFLECTION](mat, state, thePrd);
-				feval = sysBRDFEval[POptix::EBrdfTypes::MICROFACET_REFLECTION](mat, state, thePrd);
-				pdf = thePrd.pdf;
-			}
-
-			if (0.0f < pdf && isNotNull(feval))
-			{
-				// Do the visibility check of the light sample.
-				ShadowPRD prdShadow;
-				prdShadow.visible = true; // Initialize for miss.
-
-				// Note that the sysSceneEpsilon is applied on both sides of the shadow ray [t_min, t_max] interval 
-				// to prevent self intersections with the actual light geometry in the scene!
-				optix::Ray ray = optix::make_Ray(thePrd.hit_pos, lightSample.direction, 1, sysSceneEpsilon, lightSample.distance - sysSceneEpsilon); // Shadow ray.
-				rtTrace(sysTopObject, ray, prdShadow);
-
-				if (prdShadow.visible)
-				{
-					const float misWeight = powerHeuristic(lightSample.pdf, pdf);
-					thePrd.radiance += feval * lightSample.emission * (misWeight * fabsf(optix::dot(lightSample.direction, shading_normal)) / lightSample.pdf);
-				}
-			}
-		}
-	}
+	thePrd.radiance += DirectLighting(mat, state);
 #endif // USE_NEXT_EVENT_ESTIMATION
 }
 
@@ -192,4 +133,88 @@ RT_PROGRAM void any_hit()
 	rtTerminateRay();
 
 	thePrd.flags |= FLAG_TERMINATE;
+}
+
+RT_FUNCTION float3 DirectLighting(POptix::Material &mat, State& state)
+{
+	float3 result = make_float3(0.0f);
+	if ((thePrd.brdf_flags & (POptix::BSDF_DIFFUSE | POptix::BSDF_GLOSSY)) && sysNumberOfLights > 0)
+	{
+		// Setp 1: Sample one of many lights.
+		POptix::LightSample lightSample;
+
+		int lightNum = min((int)(rng(thePrd.seed) * sysNumberOfLights), sysNumberOfLights - 1);
+		float lightPdf = 1.0f / sysNumberOfLights;
+		POptix::Light sampledlight = sysLightParameters[lightNum];
+
+		// Step 2: lightSample direction and distance and directLightPDF returned in world space!
+		sysLightSample[sampledlight.lightType](sampledlight, thePrd, lightSample, state);
+
+		float3 Ld = make_float3(0.0f);
+		float3 Li = make_float3(0.0f);
+		// Sample light source with multiple importance sampling
+		float directLightPdf = 0.0f;
+		float scatteringPdf = 0.0f;
+
+		if (lightSample.pdf == 0 || lightSample.distance == 0) 
+		{
+			return make_float3(0.0f);
+		}
+
+		if (dot(sampledlight.normal, -lightSample.direction) > 0.0f)
+		{
+			Li = lightSample.emission;
+			directLightPdf = lightSample.pdf;
+		}
+
+		if (lightSample.pdf > 0.0f && isNotNull(Li))
+		{
+			// Step 3: Compute BSDF value for light sample
+			float3 f = make_float3(0.0f);
+			if (thePrd.brdf_flags & POptix::BSDF_DIFFUSE)
+			{
+				// Diffuse evaluation
+				sysBRDFPdf[POptix::EBrdfTypes::LAMBERT](mat, state, thePrd);
+				f = sysBRDFEval[POptix::EBrdfTypes::LAMBERT](mat, state, thePrd);
+				scatteringPdf = thePrd.pdf;
+			}
+			else if (thePrd.brdf_flags & POptix::BSDF_GLOSSY)
+			{
+				// Specular evaluation
+				sysBRDFPdf[POptix::EBrdfTypes::MICROFACET_REFLECTION](mat, state, thePrd);
+				f = sysBRDFEval[POptix::EBrdfTypes::MICROFACET_REFLECTION](mat, state, thePrd);
+				scatteringPdf = thePrd.pdf;
+			}
+
+			if (isNotNull(f)) 
+			{
+				// Do the visibility check of the light sample.
+				ShadowPRD prdShadow;
+				prdShadow.visible = true; // Initialize for miss.
+
+				// Note that the sysSceneEpsilon is applied on both sides of the shadow ray [t_min, t_max] interval 
+				// to prevent self intersections with the actual light geometry in the scene!
+				float3 lightDir = normalize(lightSample.direction);
+				optix::Ray ray = optix::make_Ray(thePrd.hit_pos, lightDir, 1, sysSceneEpsilon, lightSample.distance - sysSceneEpsilon); // Shadow ray.
+				rtTrace(sysTopObject, ray, prdShadow);
+
+				if (prdShadow.visible)
+				{
+					// Add light's contribution to reflected radiance
+					if (sampledlight.isDelta)
+					{
+						Ld += f * Li / directLightPdf;
+					}
+					else 
+					{
+						float weight = PowerHeuristic(1.f, directLightPdf, 1.0f, scatteringPdf);
+						Ld += f * Li * weight / directLightPdf;
+					}
+				}
+			}
+		}
+		result = Ld / lightPdf;
+	}
+
+	return result;
 }

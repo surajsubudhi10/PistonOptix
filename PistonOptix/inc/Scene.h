@@ -55,6 +55,7 @@ namespace POptix
 		static POptix::Mesh* createPlane(const int tessU, const int tessV, const int upAxis);
 		static POptix::Mesh* createSphere(const int tessU, const int tessV, const float radius, const float maxTheta);
 		static POptix::Mesh* createTorus(const int tessU, const int tessV, const float innerRadius, const float outerRadius);
+		static POptix::Mesh* createParallelogram(optix::float3 const& position, optix::float3 const& vecU, optix::float3 const& vecV, optix::float3 const& normal);
 
 		static Scene* LoadScene(const char* sceneFilePath);
 		static Mesh* LoadOBJ(std::string inputfile);
@@ -66,9 +67,6 @@ namespace POptix
 		vector<Light*> mLightList;
 		PinholeCamera* mCamera;
 	};
-
-	
-
 }
 
 #endif // SCENE_H

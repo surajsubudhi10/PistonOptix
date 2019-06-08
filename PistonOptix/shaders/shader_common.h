@@ -223,6 +223,12 @@ RT_FUNCTION float powerHeuristic(const float a, const float b)
 	return t / (t + b * b);
 }
 
+RT_FUNCTION float PowerHeuristic(int nf, float fPdf, int ng, float gPdf) 
+{
+	float f = nf * fPdf, g = ng * gPdf;
+	return (f * f) / (f * f + g * g);
+}
+
 RT_FUNCTION float balanceHeuristic(const float a, const float b)
 {
 	return a / (a + b);

@@ -972,16 +972,14 @@ void Application::guiEventHandler()
 	}
 }
 
-void Application::createGeometry(optix::Geometry& geometry, uint materialID, float * transform)
+void Application::createGeometry(optix::Geometry& geometry, optix::Material& material, uint materialID, float * transform)
 {
 	try
 	{
-		//optix::Geometry geometry = LoadOBJ(objPath);
-
 		optix::GeometryInstance giGeo = m_context->createGeometryInstance(); // This connects Geometries with Materials.
 		giGeo->setGeometry(geometry);
 		giGeo->setMaterialCount(1);
-		giGeo->setMaterial(0, m_opaqueMaterial);
+		giGeo->setMaterial(0, material);
 		giGeo["parMaterialIndex"]->setInt(materialID); // This is all! This defines which material parameters in sysMaterialParametrers to use.
 
 		optix::Acceleration accGeo = m_context->createAcceleration(m_builder);
@@ -1073,6 +1071,7 @@ void Application::initPrograms()
 		// Material programs. There are only three Material nodes, opaque, cutout opacity and rectangle lights.
 		// For the radiance ray type 0:
 		m_mapOfPrograms["closesthit"] = m_context->createProgramFromPTXFile(ptxPath("closesthit.cu"), "closesthit");
+		m_mapOfPrograms["closesthit_light"] = m_context->createProgramFromPTXFile(ptxPath("closesthit_light.cu"), "closesthit_light");
 		// For the radiance ray type 1:
 		m_mapOfPrograms["any_hit"] = m_context->createProgramFromPTXFile(ptxPath("closesthit.cu"), "any_hit");
 
@@ -1178,7 +1177,8 @@ void Application::updateMaterialParameters()
 void Application::updateLightParameters()
 {
 	POptix::Light* dst = static_cast<POptix::Light*>(m_bufferLightParameters->map(0, RT_BUFFER_MAP_WRITE_DISCARD));
-	for (size_t i = 0; i < scene->mLightList.size(); ++i, ++dst) {
+	for (size_t i = 0; i < scene->mLightList.size(); ++i, ++dst) 
+	{
 		POptix::Light* mat = scene->mLightList[i];
 
 		dst->position	= mat->position;
@@ -1187,8 +1187,9 @@ void Application::updateLightParameters()
 		dst->area		= mat->area;
 		dst->u			= mat->u;
 		dst->v			= mat->v;
-		dst->direction	= mat->direction;
+		dst->normal		= mat->normal;
 		dst->lightType	= mat->lightType;
+		dst->isDelta	= mat->isDelta;
 	}
 	m_bufferLightParameters->unmap();
 }
@@ -1205,29 +1206,7 @@ void Application::initMaterials()
 		parameters.metallic = mat->metallic;
 		m_guiMaterialParameters.push_back(parameters);
 	}
-	/*
-	// Make all parameters white to show automatic ambient occlusion with a brute force full global illumination path tracer.
-	parameters.albedo = optix::make_float3(0.6f);
-	parameters.roughness = 1.0f;
-	parameters.metallic = 0.0f;
-	m_guiMaterialParameters.push_back(parameters); // 0, floor
-
-	parameters.albedo = optix::make_float3(0.0f);
-	parameters.roughness = 0.5f;
-	parameters.metallic = 0.0f;
-	m_guiMaterialParameters.push_back(parameters); // 1, box
-
-	parameters.albedo = optix::make_float3(1.0f, 0.0f, 0.0f);
-	parameters.roughness = 0.5f;
-	parameters.metallic = 1.0f;
-	m_guiMaterialParameters.push_back(parameters); // 2, sphere
-
-	parameters.albedo = optix::make_float3(1.0f);
-	parameters.roughness = 1.0f;
-	parameters.metallic = 0.0f;
-	m_guiMaterialParameters.push_back(parameters); // 3, torus
-	*/
-
+	
 	try
 	{
 		m_bufferMaterialParameters = m_context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_USER);
@@ -1252,6 +1231,18 @@ void Application::initMaterials()
 		it = m_mapOfPrograms.find("any_hit");
 		MY_ASSERT(it != m_mapOfPrograms.end());
 		m_opaqueMaterial->setAnyHitProgram(1, it->second); // raytype shadow
+
+		// Used for all lights in the scene.
+		m_lightMaterial = m_context->createMaterial();
+
+		it = m_mapOfPrograms.find("closesthit_light");
+		MY_ASSERT(it != m_mapOfPrograms.end());
+		m_lightMaterial->setClosestHitProgram(0, it->second); // raytype radiance
+
+		it = m_mapOfPrograms.find("any_hit");
+		MY_ASSERT(it != m_mapOfPrograms.end());
+		m_lightMaterial->setAnyHitProgram(1, it->second); // raytype shadow
+
 	}
 	catch (optix::Exception& e)
 	{
@@ -1297,6 +1288,7 @@ void Application::createScene()
 
 		m_context["sysTopObject"]->set(m_rootGroup); // This is where the rtTrace calls start the BVH traversal. (Same for radiance and shadow rays.)
 
+		// Creating Geometry referenced in node list
 		for each(POptix::Node* node in scene->mNodeList) 
 		{
 			for each(unsigned int meshID in node->mMeshIDList) 
@@ -1306,10 +1298,43 @@ void Application::createScene()
 				if (it != scene->mMeshList.end()) 
 				{
 					optix::Geometry geo = createGeometry(it->second->attributes, it->second->indices);
-					createGeometry(geo, node->materialID, node->transform);
+					createGeometry(geo, m_opaqueMaterial, node->materialID, node->transform);
 				}
 			}
 		}
+
+		// Create Light Geometry
+		for (int i = 0; i < scene->mLightList.size(); ++i)
+		{
+			POptix::Light* light = scene->mLightList[i];
+			POptix::Mesh* lightMesh = nullptr;
+			
+			if (light->lightType == POptix::ELightType::QUAD)
+			{
+				lightMesh = POptix::Scene::createParallelogram(make_float3(0.0f), light->u, light->v, light->normal);
+			}
+			else if (light->lightType == POptix::ELightType::SPHERE)
+			{
+				lightMesh = POptix::Scene::createSphere(10, 10, light->radius, M_PIf);
+			}
+			else if (light->lightType == POptix::ELightType::DIRECTIONAL)
+			{
+				// Render No Geometry
+			}
+
+			if (lightMesh != nullptr) 
+			{
+				auto pos = light->position;
+				// TODO add light transform
+				float lightTransform[16] = {1.0f, 0.0f, 0.0f, pos.x,
+											0.0f, 1.0f, 0.0f, pos.y, 
+											0.0f, 0.0f, 1.0f, pos.z, 
+											0.0f, 0.0f, 0.0f, 1.0f };
+				optix::Geometry lightgeo = createGeometry(lightMesh->attributes, lightMesh->indices);
+				createGeometry(lightgeo, m_lightMaterial, i, lightTransform);
+			}
+		}
+
 	}
 	catch (optix::Exception& e)
 	{
